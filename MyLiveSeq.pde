@@ -9,6 +9,8 @@ void setup() {
   size(500, 500);
   
   rectMode(CORNER);
+  ellipseMode(CORNER);
+  //colorMode(HSB);
   textSize(16);
   
   midiManager = new MidiManager();

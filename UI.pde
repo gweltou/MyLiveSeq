@@ -30,6 +30,8 @@ class Element {
   private color col = color(255, 0);
   private float posX = 0;
   private float posY = 0;
+  private float scaleX = 1.0f;
+  private float scaleY = 1.0f;
   private float width;
   private float height;
   
@@ -56,22 +58,10 @@ class Element {
       return getY();
     return parent.getAbsoluteY() + getY();
   }
-  public float getScaleX() { return 1.0f; }
-  public float getScaleY() { return 1.0f; }
-  public float getAbsoluteScaleX() {
-    if (parent == null)
-      return getWidth();
-    return parent.getScaleX()*getScaleX();
-  }
-  public float getAbsoluteScaleY() {
-    if (parent == null)
-      return getY();
-    return parent.getScaleY()*getScaleY();
-  }
   
   public boolean containsAbsolutePoint(float x, float y) {
-    return x > getAbsoluteX() && x < (getAbsoluteX()+getAbsoluteScaleX()*getWidth()) &&
-           y > getAbsoluteY() && y < (getAbsoluteY()+getAbsoluteScaleY()*getHeight());
+    return x > getAbsoluteX() && x < (getAbsoluteX()+getWidth()) &&
+           y > getAbsoluteY() && y < (getAbsoluteY()+getHeight());
   }
   
   public void setParent(Element element) { parent = element; }
@@ -242,6 +232,7 @@ class DynamicContainer extends Container {
     return Math.max(minHeight, super.getHeight());
   }
   
+  public void setSize(float x, float y) { super.setSize(x, y); dirty=false; }
   public void setMinSize(float x, float y) { minWidth=x; minHeight=y; }
   
   public void align() {
@@ -381,5 +372,78 @@ class Button extends DynamicContainer {
     }
     rect(getX(), getY(), getWidth(), getHeight(), 6);
     super.render();
+  }
+}
+
+
+class ToggleButton extends Button {
+  private boolean toggled = false;
+  
+  public ToggleButton() {
+    super();
+  }
+  
+  public boolean mouseClicked(MouseEvent event) {
+    super.mouseClicked(event);
+    println("toggle");
+    toggled = !toggled;
+    return true;
+  }
+  
+  public void render() {
+    if (toggled) {
+      drawToggled();
+    } else {
+      drawUntoggled();
+    }
+  }
+  
+  private void drawToggled() {
+    fill(getColor(), 64);
+    ellipse(getX(), getY(), getWidth(), getHeight());
+  }
+  private void drawUntoggled() {
+    fill(getColor(), 255);
+    ellipse(getX(), getY(), getWidth(), getHeight());
+  }
+}
+
+
+class TriStateButton extends Button {
+  private color col1, col2, col3;
+  private int state = 0;
+  
+  public TriStateButton() {
+    super();
+  }
+  
+  public void setColor(color col) {
+    super.setColor(col);
+    col1 = color(red(col)*0.6, green(col)*0.6, blue(col)*0.6);
+    col2 = color(red(col)*0.88, green(col)*0.88, blue(col)*0.88);
+    col3 = col;
+  }
+  
+  public void setState(int s) { state = s; }
+  
+  public boolean mouseClicked(MouseEvent event) {
+    super.mouseClicked(event);
+    println("toggle");
+    state = (state+1)%3;
+    return true;
+  }
+  
+  public void render() {
+    switch (state) {
+      case 0: fill(col1, 80);
+              break;
+      case 1: fill(col2, 180);
+              break;
+      case 2: fill(col3, 64);
+              ellipse(getX()-2, getY()-2, getWidth()+4, getHeight()+4);
+              fill(col3);
+              break;
+    }
+    ellipse(getX(), getY(), getWidth(), getHeight());
   }
 }
