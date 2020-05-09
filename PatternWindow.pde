@@ -74,7 +74,7 @@ class PatternWindow extends Window {
       
       setSize(width, center.getHeight()+2*getPadding());
       setPos(0, height-getHeight());
-      setAlign(ALIGN_CENTER);
+      setAlign(ALIGN_VERTICALLY);
       center.setY(center.getY()-getPadding());  // CHEAP TRICK !!!
     }
     

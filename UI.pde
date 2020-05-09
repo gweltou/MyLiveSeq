@@ -1,23 +1,63 @@
 import java.util.concurrent.Callable;
 
+
 static final int ALIGN_ROW = 1;
 static final int ALIGN_COLUMN = 2;
-static final int ALIGN_CENTER = 3;
+static final int ALIGN_HORIZONTALLY = 4;
+static final int ALIGN_VERTICALLY = 8;
+
+
+public color lighter(color c) { return colMult(c, 1.3); }
+public color light(color c) { return colMult(c, 1.15); }
+public color dark(color c) { return colMult(c, 0.75); }
+public color darker(color c) { return colMult(c, 0.5); }
+public color colMult(color c, float mul) {
+  // not sure if clamping is needed...
+  color col = color(min(255, red(c)*mul),
+                    min(255, green(c)*mul),
+                    min(255, blue(c)*mul));
+  return col;
+}
+public color colSat(color c, float amp) {
+  float r = red(c);
+  float v = green(c);
+  float b = blue(c);
+  float bri = (r+v+b) / 3;
+  return color(round(bri + (r-bri)*amp),
+               round(bri + (v-bri)*amp),
+               round(bri + (b-bri)*amp));
+}
+public color colNoise(color c, float amp) {
+  return color(red(c)+random(-amp, amp),
+               green(c)+random(-amp, amp),
+               blue(c)+random(-amp, amp));
+}
 
 
 
-class UI {
+static class UI {
   private Element root;
-  
-  public UI() {}
-  
-  public void setRoot(Element r) { root=r; }
+
+  public UI() {
+  }
+
+  public void setRoot(Element r) { 
+    root=r;
+  }
   public void render() { root.render(); }
-  
-  public void mousePressed(MouseEvent event) { root.mousePressed(event); }
-  public void mouseReleased(MouseEvent event) { root.mouseReleased(event); }
-  public void mouseClicked(MouseEvent event) { root.mouseClicked(event); }
-  public void mouseDragged(MouseEvent event) { root.mouseDragged(event); }
+
+  public void mousePressed(MouseEvent event) { 
+    root.mousePressed(event);
+  }
+  public void mouseReleased(MouseEvent event) { 
+    root.mouseReleased(event);
+  }
+  public void mouseClicked(MouseEvent event) { 
+    root.mouseClicked(event);
+  }
+  public void mouseDragged(MouseEvent event) { 
+    root.mouseDragged(event);
+  }
 }
 
 
@@ -27,27 +67,47 @@ class UI {
  ***************************************************/
 class Element {
   private Element parent = null;
-  private color col = color(255, 0);
+  public Window window = null;
+  public color col = color(127);
+  public color dark, darker, light, lighter;
+  private boolean colorFixed;
   private float posX = 0;
   private float posY = 0;
   private float scaleX = 1.0f;
   private float scaleY = 1.0f;
   private float width;
   private float height;
-  
-  public Element() {}
-  
+
+  public Element() {
+  }
+
   public float getX() { return posX; }
   public float getY() { return posY; }
   public void setX(float x) { posX=x; }
   public void setY(float y) { posY=y; }
-  public void setPos(float x, float y) { posX=x; posY=y; }
+  public void setPos(float x, float y) { 
+    posX=x; 
+    posY=y;
+  }
   public float getWidth() { return this.width; }
-  public float getHeight() { return this.height; }
-  public void setSize(float w, float h) { this.width = w; this.height = h; }
-  public void setColor(color c) { col = c; }
-  public color getColor() { return col; }
-  
+  public float getHeight() { 
+    return this.height;
+  }
+  public void setSize(float w, float h) { 
+    this.width = w; 
+    this.height = h;
+  } 
+  public void setColor(color c) { 
+    if (!colorFixed) {
+      col = c;
+      dark = dark(c);
+      darker = darker(c);
+      light = light(c);
+      lighter = lighter(c);
+    }
+  }
+  public void fixColor() { colorFixed=true; }
+
   public float getAbsoluteX() {
     if (parent == null)
       return getX();
@@ -58,24 +118,108 @@ class Element {
       return getY();
     return parent.getAbsoluteY() + getY();
   }
-  
+
   public boolean containsAbsolutePoint(float x, float y) {
     return x > getAbsoluteX() && x < (getAbsoluteX()+getWidth()) &&
-           y > getAbsoluteY() && y < (getAbsoluteY()+getHeight());
+      y > getAbsoluteY() && y < (getAbsoluteY()+getHeight());
   }
-  
-  public void setParent(Element element) { parent = element; }
-  public Element getParent() { return parent; }
-  
+
+  public void setParent(Element element) {
+    parent = element;
+    if (element != null) {
+      window = element.window;
+      setColor(parent.col);
+    }
+  }
+  public Element getParent() { 
+    return parent;
+  }
+
   public void render() {
     fill(col);
     noStroke();
     rect(getX(), getY(), getWidth(), getHeight());
   }
-  public boolean mousePressed(MouseEvent e) { return false; }
-  public boolean mouseReleased(MouseEvent e) { return false; }
-  public boolean mouseClicked(MouseEvent e) { return false; }
-  public boolean mouseDragged(MouseEvent e) { return false; }
+  public boolean mousePressed(MouseEvent e) { 
+    return false;
+  }
+  public boolean mouseReleased(MouseEvent e) { 
+    return false;
+  }
+  public boolean mouseClicked(MouseEvent e) { 
+    return false;
+  }
+  public boolean mouseDragged(MouseEvent e) { 
+    return false;
+  }
+}
+
+
+
+/***************************************************
+ ********************** WINDOW *********************
+ ***************************************************/
+class Window extends Container {
+  private Element draggedElement = null;
+  private Element selectedElement = null;
+  private final UI ui;
+
+  public Window(UI ui) {
+    this.ui = ui;
+  }
+
+  public void registerDragged(Element element) { 
+    draggedElement = element;
+  }
+  public Element getDragged() { 
+    return draggedElement;
+  }
+  public void unregisterDragged() { 
+    draggedElement = null;
+  }
+
+  public void registerSelected(Element element) { 
+    selectedElement = element;
+  }
+  public Element getSelected() { 
+    return selectedElement;
+  }
+  public void unregisterSelected() { 
+    selectedElement = null;
+  }
+
+  public void show() { 
+    ui.setRoot(this);
+  }
+
+  public boolean mouseReleased(MouseEvent event) {
+    boolean accepted = super.mouseReleased(event);
+    draggedElement = null;
+    return accepted;
+  }
+
+  public void render() {
+    super.render();
+    if (getSelected() != null) {
+      // Draw selection hint around selected object
+      float x = getSelected().getAbsoluteX();
+      float y = getSelected().getAbsoluteY();
+      float w = getSelected().getWidth();
+      float h = getSelected().getHeight();
+      noFill();
+      stroke(200, 255, 0, 120);
+      strokeWeight(8);
+      rect(x, y, w, h);
+      strokeWeight(5);
+      rect(x, y, w, h);
+      strokeWeight(4);
+      rect(x, y, w, h);
+    }
+    // Draw dragged Element on top of everything
+    if (draggedElement != null) {
+      draggedElement.render();
+    }
+  }
 }
 
 
@@ -88,11 +232,11 @@ class Container extends Element {
   private float spacing = 0f;
   private float padding = 0f;
   private int align = 0;
-  
+
   public Container() {
     super();
   }
-  
+
   public void add(Element element) {
     children.add(element);
     element.setParent(this);
@@ -105,42 +249,65 @@ class Container extends Element {
     children.remove(element);
     element.setParent(null);
   }
-  
+
   public ArrayList<Element> getChildren() {
     return children;
   }
-    
-  public void setSpacing(float s) { spacing=s; }
-  public void setPadding(float p) { padding=p; }
-  public float getPadding() { return padding; }
-  public void setAlign(int align) { this.align = align; align(); }
-  public int getAlign() { return this.align; }
   
-  public void align() {
-    float x = getPadding();
-    float y = getPadding();
-    if (align == ALIGN_ROW) {
-      for (Element child : getChildren()) {
-        child.setX(x);
-        child.setY(y);
-        x += child.getWidth() + spacing;
-      }
-    } else if (align == ALIGN_COLUMN) {
-      for (Element child : getChildren()) {
-        child.setX(x);
-        child.setY(y);
-        y += child.getHeight() + spacing;
-      }
-    } else if (align == ALIGN_CENTER) {
-      for (Element child : getChildren()) {
-        x += getWidth()/2 - child.getWidth()/2;
-        y += getHeight()/2 - child.getHeight()/2;
-        child.setX(x);
-        child.setY(y);
-      }
+  public void setColor(color c) {
+    super.setColor(c);   // Sets own color
+    for (Element child : getChildren()) {
+      child.setColor(c);
     }
   }
   
+  public void setSpacing(float s) { 
+    spacing=s;
+  }
+  public void setPadding(float p) { 
+    padding=p;
+  }
+  public float getPadding() { 
+    return padding;
+  }
+  public void setAlign(int align) { 
+    this.align = align; 
+    align();
+  }
+  public int getAlign() { 
+    return this.align;
+  }
+
+  public void align() {
+    float x, y;
+    if ((align & ALIGN_ROW) != 0) {
+      x = getPadding();
+      for (Element child : getChildren()) {
+        child.setX(x);
+        x += child.getWidth() + spacing;
+      }
+    }
+    if ((align & ALIGN_COLUMN) != 0) {
+      y = getPadding();
+      for (Element child : getChildren()) {
+        child.setY(y);
+        y += child.getHeight() + spacing;
+      }
+    }
+    if ((align & ALIGN_HORIZONTALLY) != 0) {
+      for (Element child : getChildren()) {
+        y = getHeight()/2 - child.getHeight()/2;
+        child.setY(y);
+      }
+    }
+    if ((align & ALIGN_VERTICALLY) != 0) {
+      for (Element child : getChildren()) {
+        x = getWidth()/2 - child.getWidth()/2;
+        child.setX(x);
+      }
+    }
+  }
+
   public boolean mousePressed(MouseEvent event) {
     boolean accepted = false;
     for (int i=getChildren().size()-1; i>=0; i--) {
@@ -181,11 +348,10 @@ class Container extends Element {
     }
     return accepted;
   }
-  
+
   public void render() {
-    super.render();
     pushMatrix();
-    translate(getX(), getY());
+    translate(getX()+getPadding(), getY()+getPadding());
     for (Element child : children) {
       child.render();
     }
@@ -203,24 +369,30 @@ class DynamicContainer extends Container {
   private boolean dirty = false;
   private float minWidth = 0f;
   private float minHeight = 0f;
-  
+
   public DynamicContainer() {
     super();
   }
-  
+
   public void add(Element element) {
     super.add(element);
     align();
+    shrink();
+    dirty = true;
   }
   public void add(int idx, Element element) {
     super.add(idx, element);
     align();
+    shrink();
+    dirty = true;
   }
   public void remove(Element element) {
     super.remove(element);
     align();
+    shrink();
+    dirty = true;
   }
-  
+
   public float getWidth() {
     if (dirty)
       updateSize();
@@ -231,10 +403,17 @@ class DynamicContainer extends Container {
       updateSize();
     return Math.max(minHeight, super.getHeight());
   }
-  
-  public void setSize(float x, float y) { super.setSize(x, y); dirty=false; }
-  public void setMinSize(float x, float y) { minWidth=x; minHeight=y; }
-  
+
+  public void setSize(float x, float y) { 
+    super.setSize(x, y); 
+    dirty=false;
+  }
+  public void setMinSize(float x, float y) { 
+    minWidth=x; 
+    minHeight=y;
+    dirty=true;
+  }
+
   public void align() {
     if (getAlign() != 0) {
       super.align();
@@ -242,17 +421,31 @@ class DynamicContainer extends Container {
     }
   }
   
+  public void shrink() {
+    // Reposition every child so there's no empty room around
+    float xoff = 9999;
+    float yoff = 9999;
+    for (Element child : getChildren()) {
+      xoff = min(child.getX(), xoff);
+      yoff = min(child.getY(), yoff);
+    }
+    for (Element child : getChildren()) {
+      child.setPos(child.getX()-xoff, child.getY()-yoff);
+    }
+  }
+  
   protected void updateSize() {
-    float maxWidth = minWidth;
-    float maxHeight = minHeight;
-    
+    // Calculate size of outer area
+    float maxWidth = minWidth-getPadding();
+    float maxHeight = minHeight-getPadding();
+
     for (Element child : getChildren()) {
       if (child.getX()+child.getWidth() > maxWidth)
         maxWidth = child.getX()+child.getWidth();
       if (child.getY()+child.getHeight() > maxHeight)
         maxHeight = child.getY()+child.getHeight();
     }
-    setSize(maxWidth+getPadding(), maxHeight+getPadding());
+    setSize(maxWidth+2*getPadding(), maxHeight+2*getPadding());
     dirty = false;
   }
 }
@@ -266,7 +459,7 @@ class DragPane extends Container {
   public DragPane() {
     super();
   }
-  
+
   public boolean mouseDragged(MouseEvent event) {
     // Move world if right mouse drag
     if (event.getButton() == RIGHT) {
@@ -280,7 +473,7 @@ class DragPane extends Container {
     }
     return super.mouseDragged(event);
   }
-  
+
   public void render() {
     pushMatrix();
     translate(getX(), getY());
@@ -296,22 +489,33 @@ class DragPane extends Container {
  ***************************************************/
 class Label extends Element {
   private String value;
-  
+  private int textWeight = 16;
+
   public Label(String s) {
+    super();
     value = s;
-    setSize(textWidth(s), textAscent()+textDescent());
-    setColor(color(0, 255));
+    setTextSize(16);
   }
-  
+
   public void setValue(String s) {
     value = s;
-    setSize(textWidth(s), textAscent()+textDescent());
+    setSize(textWidth(s), textAscent());
   }
-  
+  public void setColor(color c) {
+    super.setColor(darker(c));
+  }
+
+  public void setTextSize(int weight) {
+    textWeight=weight;
+    textSize(textWeight);
+    setSize(textWidth(value), textAscent());
+  }
+
   public void render() {
-    fill(getColor());
+    textSize(textWeight);
+    fill(dark);
     pushMatrix();
-    translate(0, getHeight()-((Container) getParent()).getPadding());
+    translate(0, getHeight()-textDescent()/2);
     text(value, getX(), getY());
     popMatrix();
   }
@@ -323,28 +527,34 @@ class Label extends Element {
  ****************** Button Element *****************
  ***************************************************/
 class Button extends DynamicContainer {
-  //private Label label = null;
+  private Label label = null;
   private boolean pressed = false;
-  
+
   public Button() {
     super();
     setPadding(4);
-    setAlign(ALIGN_CENTER);
+    setAlign(ALIGN_HORIZONTALLY + ALIGN_VERTICALLY);
   }
-  
+
   public Button(String value) {
     this();
-    add(new Label(value));
+    setValue(value);
   }
   
+  public void setColor(color c) {
+    super.setColor(light(c));
+  }
+
   public void setValue(String value) {
+    label = new Label(value);
+    label.setTextSize(14);
     getChildren().clear();
-    add(new Label(value));
+    add(label);
   }
-  
+
   public void action() {
   }
-  
+
   public boolean mousePressed(MouseEvent event) {
     if (event.getButton() == LEFT) {
       pressed = true;
@@ -361,89 +571,192 @@ class Button extends DynamicContainer {
     pressed = false;
     return true;
   }
-  
-  public void render() { 
-    stroke(0);
+
+  public void render() {
+    // Draw background
     noStroke();
-    if (pressed) {
-      fill(140);
-    } else {
-      fill(220);
-    }
+    fill(pressed ? dark : col);
     rect(getX(), getY(), getWidth(), getHeight(), 6);
+    
+    // Draw Children
     super.render();
+    
+    // Draw border
+    noFill();
+    stroke(pressed ? dark : darker);
+    strokeWeight(0.5);
+    rect(getX(), getY(), getWidth(), getHeight(), 6);
   }
 }
 
 
+
+/***************************************************
+ ******************* TOGGLE BUTTON *****************
+ ***************************************************/
 class ToggleButton extends Button {
   private boolean toggled = false;
-  
+
   public ToggleButton() {
     super();
   }
-  
+
   public boolean mouseClicked(MouseEvent event) {
     super.mouseClicked(event);
-    println("toggle");
     toggled = !toggled;
     return true;
   }
-  
+
   public void render() {
+    noStroke();
     if (toggled) {
       drawToggled();
     } else {
       drawUntoggled();
     }
   }
-  
+
   private void drawToggled() {
-    fill(getColor(), 64);
+    fill(lighter);
+    ellipse(getX()-2, getY()-2, getWidth()+4, getHeight()+4);
+    fill(col);
     ellipse(getX(), getY(), getWidth(), getHeight());
+    fill(lighter);
+    ellipse(getX()+2, getY()+2, getWidth()-4, getHeight()-4);
+    //ellipse(getX()+2, getY()+2, getWidth()*0.4, getHeight()*0.4);
   }
   private void drawUntoggled() {
-    fill(getColor(), 255);
+    fill(darker);
     ellipse(getX(), getY(), getWidth(), getHeight());
+    fill(dark);
+    ellipse(getX()+2, getY()+2, getWidth()-4, getHeight()-4);
   }
 }
 
 
-class TriStateButton extends Button {
-  private color col1, col2, col3;
+
+/***************************************************
+ ****************** TRISTATE BUTTON ****************
+ ***************************************************/
+class TriStateButton extends ToggleButton {
+  //private color col1, col2, col3;
   private int state = 0;
-  
+
   public TriStateButton() {
     super();
   }
-  
-  public void setColor(color col) {
-    super.setColor(col);
-    col1 = color(red(col)*0.6, green(col)*0.6, blue(col)*0.6);
-    col2 = color(red(col)*0.88, green(col)*0.88, blue(col)*0.88);
-    col3 = col;
+
+  public void setState(int s) { 
+    state = s;
   }
-  
-  public void setState(int s) { state = s; }
-  
+
   public boolean mouseClicked(MouseEvent event) {
     super.mouseClicked(event);
-    println("toggle");
     state = (state+1)%3;
+    return true;
+  }
+
+  public void render() {
+    noStroke();
+    switch (state) {
+    case 0: 
+      fill(darker, 120);
+      ellipse(getX(), getY(), getWidth(), getHeight());
+      break;
+    case 1: 
+      fill(col, 100);
+      ellipse(getX(), getY(), getWidth(), getHeight());
+      break;
+    case 2: 
+      fill(lighter, 40);
+      ellipse(getX()-2, getY()-2, getWidth()+4, getHeight()+4);
+      fill(lighter);
+      ellipse(getX(), getY(), getWidth(), getHeight());
+      fill(255, 64);
+      ellipse(getX()+2, getY()+2, getWidth()-4, getHeight()-4);
+      break;
+    default: 
+      break;
+    }
+  }
+}
+
+
+
+/***************************************************
+ ********************** KNOB ***********************
+ ***************************************************/
+public class Knob extends Element {
+  private float value;
+
+  public Knob() {
+    setSize(28, 28);
+    setColor(lighter);
+  }
+  
+  public boolean mouseClicked(MouseEvent event) {
+    value = random(0, 127);
     return true;
   }
   
   public void render() {
-    switch (state) {
-      case 0: fill(col1, 80);
-              break;
-      case 1: fill(col2, 180);
-              break;
-      case 2: fill(col3, 64);
-              ellipse(getX()-2, getY()-2, getWidth()+4, getHeight()+4);
-              fill(col3);
-              break;
-    }
+    stroke(dark, 180);
+    strokeWeight(5);
+    noFill();
+    arc(getX(), getY(), getWidth(), getHeight(), PI-0.8, TWO_PI+0.8);
+    fill(lighter);
+    stroke(darker);
+    strokeWeight(0.5);
     ellipse(getX(), getY(), getWidth(), getHeight());
+    
+    // Knob value marquer
+    float angle = HALF_PI;
+    float r = 0.35 * getWidth();
+    float mx = getX() + 0.5*getWidth() + r*cos(angle);
+    float my = getY() + 0.5*getHeight() - r*sin(angle);
+    strokeWeight(5);
+    point(mx, my);
+  }
+}
+
+
+
+/***************************************************
+ ******************** CONTROLLER *******************
+ ***************************************************/
+public class Controller extends DynamicContainer {
+  private Label label;
+  private Knob knob;
+  private Label val;
+
+  public Controller(String s) {
+    label = new Label(s);
+    label.setTextSize(12);
+    knob = new Knob();
+    val = new Label("120");
+    val.setTextSize(12);
+    
+    setPadding(2);
+    setSpacing(1);
+    setAlign(ALIGN_COLUMN + ALIGN_VERTICALLY);
+    add(label);
+    add(knob);
+    add(val);
+  }
+  
+  public boolean mouseDragged(MouseEvent event) {
+    println(window);
+    if (window != null && window.getDragged() == null) {
+      window.registerDragged(this);
+      return true;
+    }
+    return false;
+  }
+  
+  public void render() {
+    fill(light);
+    noStroke();
+    rect(getX(), getY(), getWidth(), getHeight(), 6);
+    super.render();
   }
 }

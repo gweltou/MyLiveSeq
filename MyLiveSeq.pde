@@ -1,6 +1,7 @@
 MidiManager midiManager;
 UI ui = new UI();
 TracksWindow tracksWindow;
+PatternWindow patternWindow;
 
 color bgcolor = color(245);
 
@@ -11,12 +12,14 @@ void setup() {
   rectMode(CORNER);
   ellipseMode(CORNER);
   //colorMode(HSB);
-  textSize(16);
+  //textSize(16);
   
   midiManager = new MidiManager();
   midiManager.start();
   
   tracksWindow = new TracksWindow(ui);
+  patternWindow = new PatternWindow(ui);
+  
   tracksWindow.show();
 }
 
