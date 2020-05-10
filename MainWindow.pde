@@ -9,15 +9,15 @@ class ToolBar extends DynamicContainer {
     setSpacing(4);
     setPadding(3);
     
-    DynamicContainer btnBox = new DynamicContainer();
-    btnBox.setSpacing(3);
-    btnBox.setPadding(2);
-    add(btnBox);
-    Button playBtn = new Button("PLAY");
-    btnBox.add(playBtn);
-    Button stopBtn = new Button("STOP");
-    btnBox.add(stopBtn);
-    btnBox.setAlign(ALIGN_COLUMN + ALIGN_VERTICALLY);
+    DynamicContainer transport = new DynamicContainer();
+    transport.setSpacing(3);
+    transport.setPadding(2);
+    add(transport);
+    Button playBtn = new PlayButton("PLAY");
+    transport.add(playBtn);
+    Button stopBtn = new StopButton("STOP");
+    transport.add(stopBtn);
+    transport.setAlign(ALIGN_COLUMN + ALIGN_VERTICALLY);
     
     Controller tempoCtrl = new Controller("BPM");
     tempoCtrl.setBoundaries(20, 400);
@@ -37,6 +37,23 @@ class ToolBar extends DynamicContainer {
     stroke(dark);
     strokeWeight(1.6);
     line(getX(), getHeight(), getWidth(), getHeight());
+  }
+  
+  class PlayButton extends Button {
+    public PlayButton(String s) {
+      super(s);
+    }
+    public void action() {
+      midiManager.play();
+    }
+  }
+  class StopButton extends Button {
+    public StopButton(String s) {
+      super(s);
+    }
+    public void action() {
+      midiManager.playStop();
+    }
   }
 }
 
@@ -76,7 +93,6 @@ class BottomBar extends Container {
 
 
 
-
 /***************************************************
  ***************** TRACKS WINDOW *******************
  ***************************************************/
@@ -88,6 +104,7 @@ class TracksWindow extends Window {
   public TracksWindow(UI ui) {
     super(ui);
     setWindow(this);
+    setColor(color(127));
         
     centerPane = new TracksDragPane();
     centerPane.setSize(width, height);
@@ -102,9 +119,10 @@ class TracksWindow extends Window {
         PatternUI pat = new PatternUI();
         pat.setSize(random(40, 100), 64);
         track.addPattern(pat);
-        pat.fixColor();
+        pat.setColorFixed();
       }
     }
+    
     Button btnAdd = new ButtonAdd();
     tracksContainer.add(btnAdd);
     
@@ -141,7 +159,7 @@ class TracksWindow extends Window {
       PatternUI pat = new PatternUI();
       track.addPattern(pat);
       pat.setSize(random(40, 100), 64);
-      pat.fixColor();
+      pat.setColorFixed();
       getWindow().registerSelected(pat);
     }
   }
@@ -174,10 +192,14 @@ class TracksWindow extends Window {
       add(swingCtrl);
       Controller speedCtrl = new Controller("SPEED");
       add(speedCtrl);
-      Controller randomCtrl = new Controller("RAND");
-      add(randomCtrl);
+      Controller randomMelCtrl = new Controller("RND Ml");
+      randomMelCtrl.setValue(0);
+      add(randomMelCtrl);
+      Controller randomRytCtrl = new Controller("RND Ry");
+      randomRytCtrl.setValue(0);
+      add(randomRytCtrl);
       
-      setSize(width, getHeight());
+      setSizeFixed(width, getHeight());
     }
   }
   
@@ -188,9 +210,9 @@ class TracksWindow extends Window {
   class TracksBottomBar extends BottomBar {
     public TracksBottomBar() {
       super();
-      Button midiBtn = new Button("Midi Conf.");
+      Button midiBtn = new ConfigButton("Midi Conf.");
       center.add(midiBtn);
-      Button peBtn = new ButtonEdit();
+      Button peBtn = new EditButton("Edit");
       center.add(peBtn);
       Button loadBtn = new Button("Load");
       center.add(loadBtn);
@@ -202,12 +224,20 @@ class TracksWindow extends Window {
       align();
     }
     
-    private class ButtonEdit extends Button {
-      public ButtonEdit() {
-        super("Edit");
+    private class ConfigButton extends Button {
+      public ConfigButton(String s) {
+        super(s);
       }
       public void action() {
-        patternWindow.show();
+        new ConfigWindow(ui).show();
+      }
+    }
+    private class EditButton extends Button {
+      public EditButton(String s) {
+        super(s);
+      }
+      public void action() {
+        new PatternWindow(ui).show();
       }
     }
   }
@@ -219,6 +249,7 @@ class TracksWindow extends Window {
   class TrackContainer extends DynamicContainer {
     private DynamicContainer msButtons;
     private PatternContainer patterns;
+    private DynamicContainer addButtons;
 
     public TrackContainer() {
       super();
@@ -231,32 +262,58 @@ class TracksWindow extends Window {
       msButtons.setSpacing(2);
       msButtons.setAlign(ALIGN_COLUMN);
       float toggleSize = 18;
-      ToggleButton muteToggle = new ToggleButton();
-      muteToggle.setSize(toggleSize, toggleSize);
+      ToggleLed muteToggle = new ToggleLed();
+      muteToggle.setSizeFixed(toggleSize, toggleSize);
       msButtons.add(muteToggle);
-      muteToggle.setColor(color(244, 0, 0));
-      ToggleButton soloToggle = new ToggleButton();
-      soloToggle.setSize(toggleSize, toggleSize);
+      muteToggle.setColorFixed(color(244, 0, 0));
+      ToggleLed soloToggle = new ToggleLed();
+      soloToggle.setSizeFixed(toggleSize, toggleSize);
       msButtons.add(soloToggle);
-      soloToggle.setColor(color(150, 150, 244));
+      soloToggle.setColorFixed(color(140, 120, 244));
       TriStateButton loopToggle = new TriStateButton();
-      loopToggle.setSize(toggleSize, toggleSize);
+      loopToggle.setSizeFixed(toggleSize, toggleSize);
       msButtons.add(loopToggle);
-      loopToggle.setColor(color(240, 240, 0));
+      loopToggle.setColorFixed(color(240, 240, 0));
       
       // Patterns
       patterns = new PatternContainer();
       add(patterns);
+      
+      // Add New Pattern Buttons
+      addButtons = new DynamicContainer();
+      add(addButtons);
+      addButtons.add(new AddPatButton("+"));
+      
+      //addButtons.setAlign(ALIGN_VERTICALLY);
     }
-
+    
+    public void align() {
+      super.align();
+      println("align");
+    }
+    
+    private class AddPatButton extends Button {
+      public AddPatButton(String s) {
+        super(s);
+      }
+      public void action() {
+        println("action");
+      }
+      public void setX(float x) {
+        super.setX(x);
+        println("New x : " +x);
+      }
+    }
+    
     public void addPattern(PatternUI pattern) {
+      println("pattern added");
       patterns.add(pattern);
     }
     public void addPattern(int idx, PatternUI pattern) {
-      //pattern.setY(0);
+      println("pattern added");
       patterns.add(idx, pattern);
     }
-
+    
     public void setColor(color c) {
       super.setColor(colNoise(c, 50));
     }
@@ -280,19 +337,27 @@ class TracksWindow extends Window {
     public void add(Element pattern) {
       pattern.setY(0);
       super.add(pattern);
+      ((DynamicContainer) getParent()).align();
+      ((DynamicContainer) getParent()).shrink();
     }
     public void add(int idx, Element pattern) {
       pattern.setY(0);
       super.add(idx, pattern);
+      ((DynamicContainer) getParent()).align();
+      ((DynamicContainer) getParent()).shrink();
     }
     public void remove(PatternUI pattern) {
       super.remove(pattern);
+      
       // Delete whole track if empty
       if (getChildren().size() == 0) {
         if (getSelected() == this)
           unregisterSelected();
         tracksContainer.remove(this.getParent());
       }
+      
+      ((DynamicContainer) getParent()).align();
+      ((DynamicContainer) getParent()).shrink();
     }
     
     public float getWidth() {

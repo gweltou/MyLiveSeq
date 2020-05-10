@@ -1,7 +1,6 @@
 MidiManager midiManager;
 UI ui = new UI();
 TracksWindow tracksWindow;
-PatternWindow patternWindow;
 
 color bgcolor = color(245);
 
@@ -15,7 +14,6 @@ void setup() {
   midiManager.start();
   
   tracksWindow = new TracksWindow(ui);
-  patternWindow = new PatternWindow(ui);
   
   tracksWindow.show();
 }

@@ -1,10 +1,12 @@
 import java.util.concurrent.Callable;
 
+static final boolean DEBUG = false;
 
 static final int ALIGN_ROW = 1;
 static final int ALIGN_COLUMN = 2;
 static final int ALIGN_HORIZONTALLY = 4;
 static final int ALIGN_VERTICALLY = 8;
+static final int ALIGN_RIGHT = 16;
 
 
 public color lighter(color c) { return colMult(c, 1.3); }
@@ -83,7 +85,8 @@ class Element {
   private Window window;
   public color col = color(127);
   public color dark, darker, light, lighter;
-  private boolean colorFixed;
+  public boolean colorFixed;
+  public boolean sizeFixed;
   private float posX = 0;
   private float posY = 0;
   private float scaleX = 1.0f;
@@ -105,11 +108,19 @@ class Element {
   }
   public float getWidth() { return this.width; }
   public float getHeight() { return this.height; }
-  public void setSize(float w, float h) { 
-    this.width = w; 
-    this.height = h;
+  public void setSize(float w, float h) {
+    if (!sizeFixed) {
+      this.width = w; 
+      this.height = h;
+    }
   }
-  public boolean isDirty() { return dirty; }
+  public void setSizeFixed() { sizeFixed=true; }
+  public void setSizeFixed(float w, float h) { setSize(w, h); sizeFixed=true; }
+  public boolean isDirty() { 
+    if (sizeFixed)
+      return false;
+    return dirty;
+  }
   public void setDirty(boolean t) { dirty=t; }
   public void setColor(color c) { 
     if (!colorFixed) {
@@ -120,7 +131,13 @@ class Element {
       lighter = lighter(c);
     }
   }
-  public void fixColor() { colorFixed=true; }
+  public void setColorFixed() {
+    colorFixed=true;
+  }
+  public void setColorFixed(color c) {
+    setColor(c);
+    colorFixed=true;
+  }
 
   public float getAbsoluteX() {
     if (parent == null)
@@ -134,10 +151,12 @@ class Element {
   }
 
   public boolean containsAbsolutePoint(float x, float y) {
-    stroke(255,0,0);
-    strokeWeight(2);
-    noFill();
-    rect(getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+    if (DEBUG) {
+      stroke(255,0,0);
+      strokeWeight(2);
+      noFill();
+      rect(getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+    }
     return x > getAbsoluteX() && x < (getAbsoluteX()+getWidth()) &&
       y > getAbsoluteY() && y < (getAbsoluteY()+getHeight());
   }
@@ -284,6 +303,13 @@ class Container extends Element {
         child.setX(x);
       }
     }
+    if ((align & ALIGN_RIGHT) != 0) {
+      float w = getWidth()-getPadding();
+      for (Element child : getChildren()) {
+        x = child.getX() + w-child.getWidth();
+        child.setX(x);
+      }
+    }
   }
 
   public boolean mousePressed(MouseEvent event) {
@@ -355,29 +381,25 @@ class DynamicContainer extends Container {
     super.add(element);
     align();
     shrink();
-    setDirty(true);
   }
   public void add(int idx, Element element) {
     super.add(idx, element);
-    println("shite added");
     align();
     shrink();
-    setDirty(true);
   }
   public void remove(Element element) {
     super.remove(element);
     align();
     shrink();
-    setDirty(true);
   }
 
   public float getWidth() {
-    if (isDirty())
+    if (!sizeFixed)
       updateSize();
     return Math.max(minWidth, super.getWidth());
   }
   public float getHeight() {
-    if (isDirty())
+    if (!sizeFixed)
       updateSize();
     return Math.max(minHeight, super.getHeight());
   }
@@ -421,15 +443,21 @@ class DynamicContainer extends Container {
     for (Element child : getChildren()) {
       child.setPos(child.getX()-xoff, child.getY()-yoff);
     }
+    setDirty(true);
   }
   
   protected void updateSize() {
     // Calculate size of outer area
-    println("update size " + this);
+    // Never executed if sizeFixed flag is set
+    
     float maxWidth = minWidth-getPadding();
     float maxHeight = minHeight-getPadding();
 
     for (Element child : getChildren()) {
+      // Recursively ask every child to update their own size
+      if (child.isDirty())
+        ((DynamicContainer) child).updateSize();
+      
       if (child.getX()+child.getWidth() > maxWidth)
         maxWidth = child.getX()+child.getWidth();
       if (child.getY()+child.getHeight() > maxHeight)
@@ -437,9 +465,6 @@ class DynamicContainer extends Container {
     }
     setSize(maxWidth+2*getPadding(), maxHeight+2*getPadding());
     setDirty(false);
-    // The parent need to know that our size has changed
-    if (getParent() != null)
-      getParent().setDirty(true);
   }
 }
 
@@ -521,7 +546,7 @@ class Label extends Element {
  ***************************************************/
 class Button extends DynamicContainer {
   private Label label = null;
-  private boolean pressed = false;
+  protected boolean pressed = false;
 
   public Button() {
     super();
@@ -545,23 +570,25 @@ class Button extends DynamicContainer {
     add(label);
   }
 
-  public void action() {
-  }
+  public void action() { }
+
+  public void press() { pressed = true; }
+  public void release() { pressed = false; }
 
   public boolean mousePressed(MouseEvent event) {
     if (event.getButton() == LEFT) {
-      pressed = true;
+      press();
       return true;
     }
     return false;
   }
   public boolean mouseClicked(MouseEvent event) {
-    pressed = false;
+    release();
     action();
     return true;
   }
   public boolean mouseDragged(MouseEvent event) {
-    pressed = false;
+    release();
     return true;
   }
 
@@ -588,41 +615,73 @@ class Button extends DynamicContainer {
  ******************* TOGGLE BUTTON *****************
  ***************************************************/
 class ToggleButton extends Button {
-  private boolean toggled = false;
+  protected boolean toggled = false;
 
   public ToggleButton() {
     super();
   }
+  public ToggleButton(String s) {
+    super(s);
+  }
+  
+  public void toggle() {
+    toggled =! toggled;
+    if (toggled) press();
+    else release();
+  }
+  public void unToggle() {
+    toggled = false;
+    release();
+  }
+  public boolean isToggled() { return toggled; }
 
   public boolean mouseClicked(MouseEvent event) {
     super.mouseClicked(event);
-    toggled = !toggled;
+    toggle();
     return true;
   }
+  
+  public void render() {
+    if (isToggled()) {
+      pressed = true;
+    }
+    super.render();
+  }
+}
 
+
+
+/***************************************************
+ *******************  TOGGLE LED  ******************
+ ***************************************************/
+class ToggleLed extends ToggleButton {
+  public color radiant;
+  
+  public ToggleLed() {
+    super();
+  }
+  
+  public void setColor(color c) {
+    super.setColor(c);
+    radiant = colMult(c, 1.8);
+  }
+  
   public void render() {
     noStroke();
-    if (toggled) {
-      drawToggled();
+    if (isToggled()) {
+      fill(radiant);
+      ellipse(getX()-2, getY()-2, getWidth()+4, getHeight()+4);
+      fill(col);
+      ellipse(getX(), getY(), getWidth(), getHeight());
+      fill(radiant);
+      ellipse(getX()+2, getY()+2, getWidth()-4, getHeight()-4);
+      //ellipse(getX()+2, getY()+2, getWidth()*0.4, getHeight()*0.4);
     } else {
-      drawUntoggled();
+      fill(dark);
+      ellipse(getX(), getY(), getWidth(), getHeight());
+      //fill(getParent().dark);
+      //ellipse(getX()+2, getY()+2, getWidth()-4, getHeight()-4);
     }
-  }
-
-  private void drawToggled() {
-    fill(lighter);
-    ellipse(getX()-2, getY()-2, getWidth()+4, getHeight()+4);
-    fill(col);
-    ellipse(getX(), getY(), getWidth(), getHeight());
-    fill(lighter);
-    ellipse(getX()+2, getY()+2, getWidth()-4, getHeight()-4);
-    //ellipse(getX()+2, getY()+2, getWidth()*0.4, getHeight()*0.4);
-  }
-  private void drawUntoggled() {
-    fill(darker);
-    ellipse(getX(), getY(), getWidth(), getHeight());
-    fill(dark);
-    ellipse(getX()+2, getY()+2, getWidth()-4, getHeight()-4);
   }
 }
 
