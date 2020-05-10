@@ -36,14 +36,15 @@ public color colNoise(color c, float amp) {
 
 
 static class UI {
-  private Element root;
+  private Window root;
 
   public UI() {
   }
 
-  public void setRoot(Element r) { 
+  public void setWindow(Window r) { 
     root=r;
   }
+  public Window getWindow() { return root; }
   public void render() { root.render(); }
 
   public void mousePressed(MouseEvent event) { 
@@ -67,7 +68,7 @@ static class UI {
  ***************************************************/
 class Element {
   private Element parent = null;
-  public Window window = null;
+  private Window window;
   public color col = color(127);
   public color dark, darker, light, lighter;
   private boolean colorFixed;
@@ -127,14 +128,14 @@ class Element {
   public void setParent(Element element) {
     parent = element;
     if (element != null) {
-      window = element.window;
+      setWindow(parent.getWindow());
       setColor(parent.col);
     }
   }
-  public Element getParent() { 
-    return parent;
-  }
-
+  public Element getParent() { return parent; }
+  public void setWindow(Window w) { window=w;}
+  public Window getWindow() { return window; }
+  
   public void render() {
     fill(col);
     noStroke();
@@ -189,13 +190,21 @@ class Window extends Container {
   }
 
   public void show() { 
-    ui.setRoot(this);
+    ui.setWindow(this);
   }
 
   public boolean mouseReleased(MouseEvent event) {
     boolean accepted = super.mouseReleased(event);
     draggedElement = null;
     return accepted;
+  }
+  public boolean mouseDragged(MouseEvent event) {
+    boolean accepted = false;
+    if (draggedElement != null) {
+      // Send event to dragged element directly (useful for knobs)
+      accepted = draggedElement.mouseDragged(event);
+    }
+    return accepted ? accepted : super.mouseDragged(event);
   }
 
   public void render() {
@@ -207,11 +216,7 @@ class Window extends Container {
       float w = getSelected().getWidth();
       float h = getSelected().getHeight();
       noFill();
-      stroke(200, 255, 0, 120);
-      strokeWeight(8);
-      rect(x, y, w, h);
-      strokeWeight(5);
-      rect(x, y, w, h);
+      stroke(getSelected().lighter, 200);
       strokeWeight(4);
       rect(x, y, w, h);
     }
@@ -249,7 +254,13 @@ class Container extends Element {
     children.remove(element);
     element.setParent(null);
   }
-
+  public void setWindow(Window w) {
+    // Cascade down to give children a reference to root Window
+    super.setWindow(w);
+    for (Element child : getChildren()) {
+      child.setWindow(w);
+    }
+  }
   public ArrayList<Element> getChildren() {
     return children;
   }
@@ -687,16 +698,10 @@ class TriStateButton extends ToggleButton {
  ********************** KNOB ***********************
  ***************************************************/
 public class Knob extends Element {
-  private float value;
-
   public Knob() {
+    super();
     setSize(28, 28);
     setColor(lighter);
-  }
-  
-  public boolean mouseClicked(MouseEvent event) {
-    value = random(0, 127);
-    return true;
   }
   
   public void render() {
@@ -711,7 +716,7 @@ public class Knob extends Element {
     
     // Knob value marquer
     float angle = HALF_PI;
-    float r = 0.35 * getWidth();
+    float r = 0.33 * getWidth();
     float mx = getX() + 0.5*getWidth() + r*cos(angle);
     float my = getY() + 0.5*getHeight() - r*sin(angle);
     strokeWeight(5);
@@ -727,27 +732,33 @@ public class Knob extends Element {
 public class Controller extends DynamicContainer {
   private Label label;
   private Knob knob;
-  private Label val;
+  private Label valueLabel;
+  private float value;
 
   public Controller(String s) {
+    super();
     label = new Label(s);
     label.setTextSize(12);
     knob = new Knob();
-    val = new Label("120");
-    val.setTextSize(12);
+    valueLabel = new Label("120");
+    valueLabel.setTextSize(12);
     
     setPadding(2);
     setSpacing(1);
     setAlign(ALIGN_COLUMN + ALIGN_VERTICALLY);
     add(label);
     add(knob);
-    add(val);
+    add(valueLabel);
   }
   
   public boolean mouseDragged(MouseEvent event) {
-    println(window);
-    if (window != null && window.getDragged() == null) {
-      window.registerDragged(this);
+    if (getWindow().getDragged() == null) {
+      getWindow().registerDragged(this);
+      return true;
+    }
+    if (getWindow().getDragged() == this) {
+      value += pmouseY-mouseY;
+      valueLabel.setValue(String.valueOf(value));
       return true;
     }
     return false;

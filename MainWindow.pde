@@ -9,12 +9,12 @@ class TracksWindow extends Window {
 
   public TracksWindow(UI ui) {
     super(ui);
-    window = this;
-    
+    setWindow(this);
+        
     centerPane = new TracksDragPane();
     centerPane.setSize(width, height);
     add(centerPane);
-
+    
     tracksContainer = new DynamicContainer();
     centerPane.add(tracksContainer);
     for (int nt=0; nt<3; nt++) {
@@ -29,14 +29,14 @@ class TracksWindow extends Window {
     }
     Button btnAdd = new ButtonAdd();
     tracksContainer.add(btnAdd);
-
+    
     tracksContainer.setPos(10, 100);
     tracksContainer.setSpacing(4);
     tracksContainer.setAlign(ALIGN_COLUMN);
     
     toolBar = new ToolBar();
     add(toolBar);
-
+    
     BottomBar bottomBar = new BottomBar();
     add(bottomBar);
   }
@@ -56,11 +56,11 @@ class TracksWindow extends Window {
       track.addPattern(pat);
       pat.setSize(random(40, 100), 64);
       pat.fixColor();
-      registerSelected(pat);
+      getWindow().registerSelected(pat);
     }
   }
-
-
+  
+  
   /***************************************************
    ********************* TOOL BAR ********************
    ***************************************************/
@@ -97,7 +97,7 @@ class TracksWindow extends Window {
       add(speedCtrl);
       Controller randomCtrl = new Controller("RAND");
       add(randomCtrl);
-
+      
       setSize(width, getHeight());
     }
     
@@ -109,9 +109,7 @@ class TracksWindow extends Window {
       noStroke();
       fill(col);
       rect(getX(), getY(), getWidth(), getHeight());
-      
       super.render();
-      
       stroke(dark);
       strokeWeight(1.6);
       line(getX(), getHeight(), getWidth(), getHeight());
@@ -175,7 +173,7 @@ class TracksWindow extends Window {
 
 
   /***************************************************
-   ************* TrackContainer Element **************
+   ***************  TRACK CONTAINER  *****************
    ***************************************************/
   class TrackContainer extends DynamicContainer {
     private DynamicContainer msButtons;
@@ -187,6 +185,7 @@ class TracksWindow extends Window {
       
       // Left toggle buttons (mute, solo, loop)
       msButtons = new DynamicContainer();
+      add(msButtons);
       msButtons.setPadding(3);
       msButtons.setSpacing(2);
       msButtons.setAlign(ALIGN_COLUMN);
@@ -206,16 +205,13 @@ class TracksWindow extends Window {
       
       // Patterns
       patterns = new PatternContainer();
-            
-      add(msButtons);
       add(patterns);
     }
 
-    public void addPattern(PatternUI pattern) {
-      //pattern.setY(0);
+    public void addPattern(Element pattern) {
       patterns.add(pattern);
     }
-    public void addPattern(int idx, PatternUI pattern) {
+    public void addPattern(int idx, Element pattern) {
       //pattern.setY(0);
       patterns.add(idx, pattern);
     }
@@ -235,15 +231,16 @@ class TracksWindow extends Window {
     private float spacerWidth = 32;
     
     public PatternContainer() {
+      super();
       setMinSize(16, 64);
       setAlign(ALIGN_ROW);
     }
     
-    public void add(PatternUI pattern) {
+    public void add(Element pattern) {
       pattern.setY(0);
       super.add(pattern);
     }
-    public void add(int idx, PatternUI pattern) {
+    public void add(int idx, Element pattern) {
       pattern.setY(0);
       super.add(idx, pattern);
     }
@@ -266,6 +263,8 @@ class TracksWindow extends Window {
     }
     
     public boolean mouseDragged(MouseEvent event) {
+      // Select patterns container when flying on top with a pattern
+      println(getDragged());
       if (getDragged() != null && getDragged().getClass() == PatternUI.class) {
         registerSelected(this);
       }
@@ -273,7 +272,7 @@ class TracksWindow extends Window {
     }
     public boolean mouseReleased(MouseEvent event) {
       // Check if a dragged Pattern is above
-      PatternUI dragged = (PatternUI) getDragged();
+      Element dragged = getDragged();
       if (dragged != null && dragged.getClass() == PatternUI.class) {
         // Capture Pattern
         // Find array index correponding to mouse pointer position
@@ -282,10 +281,11 @@ class TracksWindow extends Window {
         ArrayList<Element> patterns = getChildren();
         for (int i=0; i<=patterns.size(); i++) {
           if (i==patterns.size() || pointerLocalX < rightBoundary+patterns.get(i).getWidth()/2) {
-            // Insert element in position
             ((Container) dragged.getParent()).remove(dragged);
-            add(i, dragged);
+            // Insert element in position
+            this.add(i, dragged);
             unregisterDragged();
+            registerSelected(dragged);
             break;
           }
           rightBoundary += getChildren().get(i).getWidth();
@@ -334,6 +334,10 @@ class TracksWindow extends Window {
    ***************** TRACKS DRAG PANE ****************
    ***************************************************/
   class TracksDragPane extends DragPane {
+    public TracksDragPane() {
+      super();
+    }
+    
     public boolean mouseClicked(MouseEvent event) {
       boolean accepted = super.mouseClicked(event);
       if (accepted == false) {
@@ -344,7 +348,7 @@ class TracksWindow extends Window {
   }
 
   /***************************************************
-   **************** PatternUI Element ****************
+   *******************   PATTERN   *******************
    ***************************************************/
   class PatternUI extends Element {
     private float scaleX = 1.0f;
@@ -370,16 +374,16 @@ class TracksWindow extends Window {
     }
     
     public void setColor(color c) {
-      super.setColor(colNoise(colSat(c, 1.3), 16));
+      super.setColor(colMult(colNoise(colSat(c, 1.14), 13), 1.36));
     }
     
-    public boolean mouseReleased(MouseEvent event) {
+    /*public boolean mouseReleased(MouseEvent event) {
       if (getDragged() == this) {
         registerSelected(this);
         return false;
       }
       return false;
-    }
+    }*/
     public boolean mouseClicked(MouseEvent event) {
       registerSelected(this);
       return true;
@@ -389,28 +393,31 @@ class TracksWindow extends Window {
       if (getDragged() == null)
         registerDragged(this);
 
-      if (getDragged() == this) {        
+      if (getDragged() == this) {
         if (getParent().getClass() == PatternContainer.class) {
-          // Center on mouse cursor
-          setX(event.getX()-getWidth()/2);
-          setY(event.getY()-getHeight()/2);
           // Detach from parent TrackContainer
           ((PatternContainer) getParent()).remove(this);
           // Add pattern to centerPane
           centerPane.add(this);
+        } else if (getParent().getClass() == TracksDragPane.class) {
+          // Center on mouse cursor
+          setX(mouseX-getWidth()/2);
+          setY(mouseY-getHeight()/2);
         }
-        float dx = mouseX - pmouseX;
-        float dy = mouseY - pmouseY;
-        setX(getX()+dx);
-        setY(getY()+dy);
       }
       return false;
     }
 
     public void render() {
-      stroke(0);
+      stroke(dark);
       strokeWeight(1);
-      fill(getSelected()==this || getDragged()==this ? lighter : col);
+      fill(col);
+      if (getSelected()==this || getSelected()==getParent()) {
+        // Selected
+        fill(light);
+      } else if (getDragged()==this) {
+        fill(lighter);
+      }
       rect(getX(), getY(), getWidth(), getHeight());
     }
   }

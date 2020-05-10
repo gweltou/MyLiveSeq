@@ -8,11 +8,8 @@ color bgcolor = color(245);
 
 void setup() {
   size(500, 500);
-  
   rectMode(CORNER);
   ellipseMode(CORNER);
-  //colorMode(HSB);
-  //textSize(16);
   
   midiManager = new MidiManager();
   midiManager.start();
@@ -22,6 +19,7 @@ void setup() {
   
   tracksWindow.show();
 }
+
 
 void draw() {
   background(bgcolor);
