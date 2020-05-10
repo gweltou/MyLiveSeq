@@ -1,9 +1,87 @@
+/***************************************************
+ ********************* TOOL BAR ********************
+ ***************************************************/
+class ToolBar extends DynamicContainer {
+  public ToolBar() {
+    super();
+    setAlign(ALIGN_ROW);
+    //setColor(color(180));
+    setSpacing(4);
+    setPadding(3);
+    
+    DynamicContainer btnBox = new DynamicContainer();
+    btnBox.setSpacing(3);
+    btnBox.setPadding(2);
+    add(btnBox);
+    Button playBtn = new Button("PLAY");
+    btnBox.add(playBtn);
+    Button stopBtn = new Button("STOP");
+    btnBox.add(stopBtn);
+    btnBox.setAlign(ALIGN_COLUMN + ALIGN_VERTICALLY);
+    
+    Controller tempoCtrl = new Controller("BPM");
+    tempoCtrl.setBoundaries(20, 400);
+    tempoCtrl.setValue(120);
+    add(tempoCtrl);
+  }
+  
+  public void setColor(color c) {
+    super.setColor(colMult(c, 1.4));
+  }
+  
+  public void render() {
+    noStroke();
+    fill(col);
+    rect(getX(), getY(), getWidth(), getHeight());
+    super.render();
+    stroke(dark);
+    strokeWeight(1.6);
+    line(getX(), getHeight(), getWidth(), getHeight());
+  }
+}
+
+
+
+/***************************************************
+ ******************* BOTTOM BAR ********************
+ ***************************************************/
+class BottomBar extends Container {
+  public DynamicContainer center = new DynamicContainer();
+
+  public BottomBar() {
+    super();
+    setPadding(3);
+    setAlign(ALIGN_VERTICALLY);
+    center.setSpacing(3);
+    center.setAlign(ALIGN_ROW);
+    add(center);
+  }
+  
+  public void setColor(color c) {
+    super.setColor(colMult(c, 1.4));
+  }
+  
+  public void render() {
+    fill(col);
+    noStroke();
+    rect(getX(), getY(), getWidth(), getHeight());
+    
+    stroke(dark);
+    float weight = 1.6;
+    strokeWeight(weight);
+    line(getX(), getY(), getX()+width, getY());
+    super.render();
+  }
+}
+
+
+
 
 /***************************************************
  ***************** TRACKS WINDOW *******************
  ***************************************************/
 class TracksWindow extends Window {
-  private final ToolBar toolBar;
+  private final TracksToolBar toolBar;
   private final TracksDragPane centerPane;
   private final DynamicContainer tracksContainer;
 
@@ -34,11 +112,19 @@ class TracksWindow extends Window {
     tracksContainer.setSpacing(4);
     tracksContainer.setAlign(ALIGN_COLUMN);
     
-    toolBar = new ToolBar();
+    toolBar = new TracksToolBar();
     add(toolBar);
     
-    BottomBar bottomBar = new BottomBar();
+    TracksBottomBar bottomBar = new TracksBottomBar();
     add(bottomBar);
+  }
+  
+  public void render() {
+    super.render();
+    // Draw dragged Element on top of everything
+    if (getDragged() != null && getDragged().getClass()==PatternUI.class) {
+      getDragged().render();
+    }
   }
   
   
@@ -62,34 +148,27 @@ class TracksWindow extends Window {
   
   
   /***************************************************
-   ********************* TOOL BAR ********************
+   ***************** TRACKS TOOL BAR *****************
    ***************************************************/
-  class ToolBar extends DynamicContainer {
-    
-    public ToolBar() {
+  class TracksToolBar extends ToolBar {
+    public TracksToolBar() {
       super();
-      setAlign(ALIGN_ROW);
-      //setColor(color(180));
-      setSpacing(4);
-      setPadding(3);
       
-      DynamicContainer btnBox = new DynamicContainer();
-      btnBox.setSpacing(3);
-      btnBox.setPadding(2);
-      add(btnBox);
-      Button playBtn = new Button("PLAY");
-      btnBox.add(playBtn);
-      Button stopBtn = new Button("STOP");
-      btnBox.add(stopBtn);
-      btnBox.setAlign(ALIGN_COLUMN + ALIGN_VERTICALLY);
-
-      Controller tempoCtrl = new Controller("BPM");
-      add(tempoCtrl);
       Controller channelCtrl = new Controller("CHAN");
+      channelCtrl.setBoundaries(1, 16);
+      channelCtrl.setValue(1);
+      DynamicContainer spacer = new DynamicContainer();
+      spacer.setMinSize(5, 0);
+      add(spacer);
+      
       add(channelCtrl);
       Controller octaveCtrl = new Controller("OCT");
+      octaveCtrl.setBoundaries(-4, 4);
+      octaveCtrl.setValue(0);
       add(octaveCtrl);
       Controller transposeCtrl = new Controller("TRA");
+      transposeCtrl.setBoundaries(-12, 12);
+      transposeCtrl.setValue(0);
       add(transposeCtrl);
       Controller swingCtrl = new Controller("SWIN");
       add(swingCtrl);
@@ -100,34 +179,15 @@ class TracksWindow extends Window {
       
       setSize(width, getHeight());
     }
-    
-    public void setColor(color c) {
-      super.setColor(colMult(c, 1.4));
-    }
-    
-    public void render() {
-      noStroke();
-      fill(col);
-      rect(getX(), getY(), getWidth(), getHeight());
-      super.render();
-      stroke(dark);
-      strokeWeight(1.6);
-      line(getX(), getHeight(), getWidth(), getHeight());
-    }
   }
   
   
   /***************************************************
-   ******************* BOTTOM BAR ********************
+   *************** TRACKS BOTTOM BAR *****************
    ***************************************************/
-  class BottomBar extends Container {
-    private DynamicContainer center = new DynamicContainer();
-
-    public BottomBar() {
-      setPadding(3);
-
-      center.setSpacing(3);
-      center.setAlign(ALIGN_ROW);
+  class TracksBottomBar extends BottomBar {
+    public TracksBottomBar() {
+      super();
       Button midiBtn = new Button("Midi Conf.");
       center.add(midiBtn);
       Button peBtn = new ButtonEdit();
@@ -136,17 +196,10 @@ class TracksWindow extends Window {
       center.add(loadBtn);
       Button saveBtn = new Button("Save");
       center.add(saveBtn);
-      add(center);
-
-      //setMinSize(width, 0);
       
       setSize(width, center.getHeight()+2*getPadding());
       setPos(0, height-getHeight());
-      setAlign(ALIGN_VERTICALLY);
-    }
-    
-    public void setColor(color c) {
-      super.setColor(colMult(c, 1.4));
+      align();
     }
     
     private class ButtonEdit extends Button {
@@ -157,20 +210,8 @@ class TracksWindow extends Window {
         patternWindow.show();
       }
     }
-    
-    public void render() {
-      fill(col);
-      noStroke();
-      rect(getX(), getY(), getWidth(), getHeight());
-      
-      stroke(dark);
-      float weight = 1.6;
-      strokeWeight(weight);
-      line(getX(), getY(), getX()+width, getY());
-      super.render();
-    }
   }
-
+    
 
   /***************************************************
    ***************  TRACK CONTAINER  *****************
@@ -208,10 +249,10 @@ class TracksWindow extends Window {
       add(patterns);
     }
 
-    public void addPattern(Element pattern) {
+    public void addPattern(PatternUI pattern) {
       patterns.add(pattern);
     }
-    public void addPattern(int idx, Element pattern) {
+    public void addPattern(int idx, PatternUI pattern) {
       //pattern.setY(0);
       patterns.add(idx, pattern);
     }
@@ -264,7 +305,6 @@ class TracksWindow extends Window {
     
     public boolean mouseDragged(MouseEvent event) {
       // Select patterns container when flying on top with a pattern
-      println(getDragged());
       if (getDragged() != null && getDragged().getClass() == PatternUI.class) {
         registerSelected(this);
       }
@@ -374,7 +414,7 @@ class TracksWindow extends Window {
     }
     
     public void setColor(color c) {
-      super.setColor(colMult(colNoise(colSat(c, 1.14), 13), 1.36));
+      super.setColor(colMult(colNoise(colSat(c, 1.2), 14), 1.33));
     }
     
     /*public boolean mouseReleased(MouseEvent event) {

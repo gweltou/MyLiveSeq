@@ -28,9 +28,24 @@ public color colSat(color c, float amp) {
                round(bri + (b-bri)*amp));
 }
 public color colNoise(color c, float amp) {
-  return color(red(c)+random(-amp, amp),
-               green(c)+random(-amp, amp),
-               blue(c)+random(-amp, amp));
+  float x = random(amp);
+  float y = random(amp-x);
+  float z = random(amp-x-y);
+  x -= amp/2; y-=amp/2; z-=amp/2;
+  float tmp;
+  // Shuffle
+  for (int i=0; i<3; i++) {
+    switch (floor(random(3))) {
+      case 0: tmp=x; x=y; y=tmp;
+              break;
+      case 1: tmp=x; x=z; z=tmp;
+              break;
+      case 2: tmp=y; y=z; z=tmp;
+              break;
+      default: break;
+    }
+  }
+  return color(red(c)+x, green(c)+y, blue(c)+z);
 }
 
 
@@ -38,12 +53,9 @@ public color colNoise(color c, float amp) {
 static class UI {
   private Window root;
 
-  public UI() {
-  }
+  public UI() { }
 
-  public void setWindow(Window r) { 
-    root=r;
-  }
+  public void setWindow(Window r) { root=r; }
   public Window getWindow() { return root; }
   public void render() { root.render(); }
 
@@ -78,6 +90,7 @@ class Element {
   private float scaleY = 1.0f;
   private float width;
   private float height;
+  private boolean dirty = false; // If size has changed
 
   public Element() {
   }
@@ -91,13 +104,13 @@ class Element {
     posY=y;
   }
   public float getWidth() { return this.width; }
-  public float getHeight() { 
-    return this.height;
-  }
+  public float getHeight() { return this.height; }
   public void setSize(float w, float h) { 
     this.width = w; 
     this.height = h;
-  } 
+  }
+  public boolean isDirty() { return dirty; }
+  public void setDirty(boolean t) { dirty=t; }
   public void setColor(color c) { 
     if (!colorFixed) {
       col = c;
@@ -121,6 +134,10 @@ class Element {
   }
 
   public boolean containsAbsolutePoint(float x, float y) {
+    stroke(255,0,0);
+    strokeWeight(2);
+    noFill();
+    rect(getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
     return x > getAbsoluteX() && x < (getAbsoluteX()+getWidth()) &&
       y > getAbsoluteY() && y < (getAbsoluteY()+getHeight());
   }
@@ -141,18 +158,10 @@ class Element {
     noStroke();
     rect(getX(), getY(), getWidth(), getHeight());
   }
-  public boolean mousePressed(MouseEvent e) { 
-    return false;
-  }
-  public boolean mouseReleased(MouseEvent e) { 
-    return false;
-  }
-  public boolean mouseClicked(MouseEvent e) { 
-    return false;
-  }
-  public boolean mouseDragged(MouseEvent e) { 
-    return false;
-  }
+  public boolean mousePressed(MouseEvent e) { return false; }
+  public boolean mouseReleased(MouseEvent e) { return false; }
+  public boolean mouseClicked(MouseEvent e) { return false; }
+  public boolean mouseDragged(MouseEvent e) { return false; }
 }
 
 
@@ -169,25 +178,12 @@ class Window extends Container {
     this.ui = ui;
   }
 
-  public void registerDragged(Element element) { 
-    draggedElement = element;
-  }
-  public Element getDragged() { 
-    return draggedElement;
-  }
-  public void unregisterDragged() { 
-    draggedElement = null;
-  }
-
-  public void registerSelected(Element element) { 
-    selectedElement = element;
-  }
-  public Element getSelected() { 
-    return selectedElement;
-  }
-  public void unregisterSelected() { 
-    selectedElement = null;
-  }
+  public void registerDragged(Element element) { draggedElement = element; }
+  public Element getDragged() { return draggedElement; }
+  public void unregisterDragged() { draggedElement = null; }
+  public void registerSelected(Element element) { selectedElement = element; }
+  public Element getSelected() { return selectedElement; }
+  public void unregisterSelected() { selectedElement = null; }
 
   public void show() { 
     ui.setWindow(this);
@@ -206,31 +202,12 @@ class Window extends Container {
     }
     return accepted ? accepted : super.mouseDragged(event);
   }
-
-  public void render() {
-    super.render();
-    if (getSelected() != null) {
-      // Draw selection hint around selected object
-      float x = getSelected().getAbsoluteX();
-      float y = getSelected().getAbsoluteY();
-      float w = getSelected().getWidth();
-      float h = getSelected().getHeight();
-      noFill();
-      stroke(getSelected().lighter, 200);
-      strokeWeight(4);
-      rect(x, y, w, h);
-    }
-    // Draw dragged Element on top of everything
-    if (draggedElement != null) {
-      draggedElement.render();
-    }
-  }
 }
 
 
 
 /***************************************************
- *************** Container Element *****************
+ ******************  CONTAINER  ********************
  ***************************************************/
 class Container extends Element {
   private ArrayList<Element> children = new ArrayList();
@@ -261,9 +238,7 @@ class Container extends Element {
       child.setWindow(w);
     }
   }
-  public ArrayList<Element> getChildren() {
-    return children;
-  }
+  public ArrayList<Element> getChildren() { return children; }
   
   public void setColor(color c) {
     super.setColor(c);   // Sets own color
@@ -272,22 +247,14 @@ class Container extends Element {
     }
   }
   
-  public void setSpacing(float s) { 
-    spacing=s;
-  }
-  public void setPadding(float p) { 
-    padding=p;
-  }
-  public float getPadding() { 
-    return padding;
-  }
+  public void setSpacing(float s) { spacing=s; }
+  public void setPadding(float p) { padding=p; }
+  public float getPadding() { return padding; }
   public void setAlign(int align) { 
     this.align = align; 
     align();
   }
-  public int getAlign() { 
-    return this.align;
-  }
+  public int getAlign() { return this.align; }
 
   public void align() {
     float x, y;
@@ -377,7 +344,6 @@ class Container extends Element {
  ***************************************************/
 class DynamicContainer extends Container {
   // This container updates its size automatically
-  private boolean dirty = false;
   private float minWidth = 0f;
   private float minHeight = 0f;
 
@@ -389,46 +355,58 @@ class DynamicContainer extends Container {
     super.add(element);
     align();
     shrink();
-    dirty = true;
+    setDirty(true);
   }
   public void add(int idx, Element element) {
     super.add(idx, element);
+    println("shite added");
     align();
     shrink();
-    dirty = true;
+    setDirty(true);
   }
   public void remove(Element element) {
     super.remove(element);
     align();
     shrink();
-    dirty = true;
+    setDirty(true);
   }
 
   public float getWidth() {
-    if (dirty)
+    if (isDirty())
       updateSize();
     return Math.max(minWidth, super.getWidth());
   }
   public float getHeight() {
-    if (dirty)
+    if (isDirty())
       updateSize();
     return Math.max(minHeight, super.getHeight());
   }
-
+  /*
+  public float getAbsoluteX() {
+    if (dirty)
+      updateSize();
+    return super.getAbsoluteX() + getPadding();
+  }
+  public float getAbsoluteY() {
+    if (dirty)
+      updateSize();
+    return super.getAbsoluteY() + getPadding();
+  }*/
+  
   public void setSize(float x, float y) { 
     super.setSize(x, y); 
-    dirty=false;
+    setDirty(false);
   }
   public void setMinSize(float x, float y) { 
     minWidth=x; 
     minHeight=y;
-    dirty=true;
+    setDirty(false);
   }
 
   public void align() {
     if (getAlign() != 0) {
       super.align();
-      dirty = true;
+      setDirty(true);
     }
   }
   
@@ -447,6 +425,7 @@ class DynamicContainer extends Container {
   
   protected void updateSize() {
     // Calculate size of outer area
+    println("update size " + this);
     float maxWidth = minWidth-getPadding();
     float maxHeight = minHeight-getPadding();
 
@@ -457,14 +436,17 @@ class DynamicContainer extends Container {
         maxHeight = child.getY()+child.getHeight();
     }
     setSize(maxWidth+2*getPadding(), maxHeight+2*getPadding());
-    dirty = false;
+    setDirty(false);
+    // The parent need to know that our size has changed
+    if (getParent() != null)
+      getParent().setDirty(true);
   }
 }
 
 
 
 /***************************************************
- ******************* Drag Pane *********************
+ ******************* DRAG PANE *********************
  ***************************************************/
 class DragPane extends Container {
   public DragPane() {
@@ -510,7 +492,7 @@ class Label extends Element {
 
   public void setValue(String s) {
     value = s;
-    setSize(textWidth(s), textAscent());
+    //setSize(textWidth(s), textAscent());
   }
   public void setColor(color c) {
     super.setColor(darker(c));
@@ -535,7 +517,7 @@ class Label extends Element {
 
 
 /***************************************************
- ****************** Button Element *****************
+ *********************  BUTTON  ********************
  ***************************************************/
 class Button extends DynamicContainer {
   private Label label = null;
@@ -698,29 +680,44 @@ class TriStateButton extends ToggleButton {
  ********************** KNOB ***********************
  ***************************************************/
 public class Knob extends Element {
+  private float angle;
+  private float minAngle, maxAngle;
+  
   public Knob() {
     super();
     setSize(28, 28);
     setColor(lighter);
+    setAngleBoundaries(PI-0.8, TWO_PI+0.8);
   }
   
+  public void setAngle(float a) { angle=a; }
+  public void setAngleBoundaries(float min, float max) {
+    minAngle = min;
+    maxAngle = max;
+  }
+  public float getMinAngle() { return minAngle; }
+  public float getMaxAngle() { return maxAngle; }
+  
   public void render() {
-    stroke(dark, 180);
+    stroke(dark);
     strokeWeight(5);
     noFill();
-    arc(getX(), getY(), getWidth(), getHeight(), PI-0.8, TWO_PI+0.8);
+    arc(getX(), getY(), getWidth(), getHeight(), getMinAngle(), getMaxAngle());
     fill(lighter);
     stroke(darker);
     strokeWeight(0.5);
     ellipse(getX(), getY(), getWidth(), getHeight());
     
     // Knob value marquer
-    float angle = HALF_PI;
     float r = 0.33 * getWidth();
-    float mx = getX() + 0.5*getWidth() + r*cos(angle);
-    float my = getY() + 0.5*getHeight() - r*sin(angle);
+    float mx = r*cos(angle);
+    float my =  -r*sin(angle);
     strokeWeight(5);
-    point(mx, my);
+    point(mx + getX()+0.5*getWidth(), my + getY()+0.5*getHeight());
+    strokeWeight(3);
+    line(mx + getX()+0.5*getWidth(), my + getY()+0.5*getHeight(),
+         0.5*mx + getX()+0.5*getWidth(), 0.5*my + getY()+0.5*getHeight());
+    
   }
 }
 
@@ -733,14 +730,18 @@ public class Controller extends DynamicContainer {
   private Label label;
   private Knob knob;
   private Label valueLabel;
-  private float value;
+  private float rawValue;
+  private float minValue = 0;
+  private float maxValue = 127;
 
   public Controller(String s) {
     super();
     label = new Label(s);
     label.setTextSize(12);
     knob = new Knob();
-    valueLabel = new Label("120");
+    rawValue = 127;
+    setBoundaries(0, 127);
+    valueLabel = new Label(String.valueOf(round(rawValue)));
     valueLabel.setTextSize(12);
     
     setPadding(2);
@@ -751,14 +752,25 @@ public class Controller extends DynamicContainer {
     add(valueLabel);
   }
   
+  public void setBoundaries(float min, float max) { minValue=min; maxValue=max; }
+  
+  public void setValue(float val) {
+    rawValue = constrain(val, minValue, maxValue);
+    valueLabel.setValue(String.valueOf(round(rawValue)));
+    float angle = map(round(rawValue), minValue, maxValue, knob.getMinAngle(), knob.getMaxAngle());
+    knob.setAngle(-angle);
+  }
+  
   public boolean mouseDragged(MouseEvent event) {
     if (getWindow().getDragged() == null) {
       getWindow().registerDragged(this);
       return true;
     }
     if (getWindow().getDragged() == this) {
-      value += pmouseY-mouseY;
-      valueLabel.setValue(String.valueOf(value));
+      float scale = 1.0f;
+      if (event.isControlDown())
+        scale = 0.2f;
+      setValue(rawValue + scale*0.005*(maxValue-minValue)*(pmouseY-mouseY));
       return true;
     }
     return false;

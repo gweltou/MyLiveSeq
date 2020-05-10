@@ -3,7 +3,7 @@
  ***************** PATTERN WINDOW ******************
  ***************************************************/
 class PatternWindow extends Window {
-  private final ToolBar toolBar;
+  private final PatternToolBar toolBar;
   //private final TracksDragPane centerPane;
   
   //centerPane = new TracksDragPane();
@@ -13,35 +13,20 @@ class PatternWindow extends Window {
   public PatternWindow(UI ui) {
     super(ui);
     
-    toolBar = new ToolBar();
+    toolBar = new PatternToolBar();
     add(toolBar);
 
-    BottomBar bottomBar = new BottomBar();
+    BottomBar bottomBar = new PatternBottomBar();
     add(bottomBar);
   }
   
   /***************************************************
    ********************* TOOL BAR ********************
    ***************************************************/
-  class ToolBar extends DynamicContainer {
+  class PatternToolBar extends ToolBar {
     
-    public ToolBar() {
-      setAlign(ALIGN_ROW);
-      setColor(color(180));
-      setSpacing(3);
-      setPadding(3);
-
-      Element spacer = new Element();
-      spacer.setColor(0);
-      spacer.setSize(1, 24+2*3);
-
-      Button playBtn = new Button("PLAY");
-      add(playBtn);
-      Button stopBtn = new Button("STOP");
-      add(stopBtn);
-      add(spacer);
-      add(new Button("Tp"));
-
+    public PatternToolBar() {
+      super();
       setSize(width, getHeight());
     }
     
@@ -54,16 +39,12 @@ class PatternWindow extends Window {
   
   
   /***************************************************
-   ******************* BOTTOM BAR ********************
+   *************** TRACKS BOTTOM BAR *****************
    ***************************************************/
-  class BottomBar extends Container {
-    DynamicContainer center = new DynamicContainer();
-
-    public BottomBar() {
-      setColor(color(180));
-      setPadding(3);
-
-      center.setSpacing(12);
+  class PatternBottomBar extends BottomBar {
+    public PatternBottomBar() {
+      super();
+      center.setSpacing(14);
       center.setAlign(ALIGN_ROW);
       Button acceptBtn = new AcceptButton();
       center.add(acceptBtn);
@@ -74,8 +55,7 @@ class PatternWindow extends Window {
       
       setSize(width, center.getHeight()+2*getPadding());
       setPos(0, height-getHeight());
-      setAlign(ALIGN_VERTICALLY);
-      center.setY(center.getY()-getPadding());  // CHEAP TRICK !!!
+      align();
     }
     
     private class AcceptButton extends Button {
