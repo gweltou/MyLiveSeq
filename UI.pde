@@ -117,12 +117,14 @@ class Element {
   }
   public void setSizeFixed() { sizeFixed=true; }
   public void setSizeFixed(float w, float h) { setSize(w, h); sizeFixed=true; }
+  public void updateSize() { }
   public boolean isDirty() { 
     if (sizeFixed)
       return false;
     return dirty;
   }
   public void setDirty(boolean t) { dirty=t; }
+  public void refresh() { }
   public void setColor(color c) { 
     if (!colorFixed) {
       col = c;
@@ -454,8 +456,18 @@ class DynamicContainer extends Container {
     }
     setDirty(true);
   }
-  
-  protected void updateSize() {
+  public void refresh() {
+    println("refres");
+    // Force updating size, used when isDirty tag is not possible
+    for (Element child : getChildren()) {
+      child.refresh();
+      child.setDirty(true);
+    }
+    align();
+    //shrink();
+    updateSize();
+  }
+  public void updateSize() {
     // Calculate size of outer area
     // Never executed if sizeFixed flag is set
     
@@ -465,7 +477,7 @@ class DynamicContainer extends Container {
     for (Element child : getChildren()) {
       // Recursively ask every child to update their own size
       if (child.isDirty())
-        ((DynamicContainer) child).updateSize();
+        child.updateSize();
       
       if (child.getX()+child.getWidth() > maxWidth)
         maxWidth = child.getX()+child.getWidth();

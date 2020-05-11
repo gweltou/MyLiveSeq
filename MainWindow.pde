@@ -118,7 +118,7 @@ class TracksWindow extends Window {
     }
     
     tracksContainer.setPos(10, 100);
-    tracksContainer.setSpacing(4);
+    tracksContainer.setSpacing(2);
     tracksContainer.setAlign(ALIGN_COLUMN);
     
     toolBar = new TracksToolBar();
@@ -148,10 +148,10 @@ class TracksWindow extends Window {
     // Zoom In/Out
     if (event.getKey() == 'a') {
       setScaleX(getScaleX()/2);
-      //tracksContainer.updateSize();
+      tracksContainer.refresh();
     } else if (event.getKey() == 'z') {
       setScaleX(getScaleX()*2);
-      //tracksContainer.updateSize();
+      tracksContainer.refresh();
     }
     return false;
   }
@@ -495,8 +495,8 @@ class TracksWindow extends Window {
       super.setColor(colMult(colNoise(colSat(c, 1.2), 14), 1.33));
     }
         
-    //public float getWidth() { return super.getWidth() * getScaleX(); }
-    //public float getHeight() { return super.getHeight() * getScaleY(); }
+    public float getWidth() { return super.getWidth() * getScaleX(); }
+    public float getHeight() { return super.getHeight() * getScaleY(); }
     
     public boolean mouseClicked(MouseEvent event) {
       registerSelected(this);
