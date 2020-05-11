@@ -28,6 +28,9 @@ void draw() {
 //
 // EVENTS
 //
+void keyPressed(KeyEvent event) {
+  ui.keyPressed(event);
+}
 void mousePressed(MouseEvent event) {
   ui.mousePressed(event);
 }

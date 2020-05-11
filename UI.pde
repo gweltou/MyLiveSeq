@@ -9,6 +9,10 @@ static final int ALIGN_VERTICALLY = 8;
 static final int ALIGN_RIGHT = 16;
 
 
+
+/************************************************
+ ******************  HELPERS  *******************
+ ************************************************/
 public color lighter(color c) { return colMult(c, 1.3); }
 public color light(color c) { return colMult(c, 1.15); }
 public color dark(color c) { return colMult(c, 0.75); }
@@ -61,12 +65,9 @@ static class UI {
   public Window getWindow() { return root; }
   public void render() { root.render(); }
 
-  public void mousePressed(MouseEvent event) { 
-    root.mousePressed(event);
-  }
-  public void mouseReleased(MouseEvent event) { 
-    root.mouseReleased(event);
-  }
+  public void keyPressed(KeyEvent event) { root.keyPressed(event); }
+  public void mousePressed(MouseEvent event) { root.mousePressed(event); }
+  public void mouseReleased(MouseEvent event) { root.mouseReleased(event); }
   public void mouseClicked(MouseEvent event) { 
     root.mouseClicked(event);
   }
@@ -177,6 +178,7 @@ class Element {
     noStroke();
     rect(getX(), getY(), getWidth(), getHeight());
   }
+  public boolean keyPressed(KeyEvent e) { return false; }
   public boolean mousePressed(MouseEvent e) { return false; }
   public boolean mouseReleased(MouseEvent e) { return false; }
   public boolean mouseClicked(MouseEvent e) { return false; }
@@ -192,11 +194,17 @@ class Window extends Container {
   private Element draggedElement = null;
   private Element selectedElement = null;
   private final UI ui;
+  private float scaleX = 1.0f;
+  private float scaleY = 1.0f;
 
   public Window(UI ui) {
     this.ui = ui;
   }
-
+  
+  public float getScaleX() { return scaleX; }
+  public float getScaleY() { return scaleY; }
+  public void setScaleX(float x) { scaleX = x; }
+  public void setScaleY(float y) { scaleY = y; }
   public void registerDragged(Element element) { draggedElement = element; }
   public Element getDragged() { return draggedElement; }
   public void unregisterDragged() { draggedElement = null; }
@@ -250,6 +258,7 @@ class Container extends Element {
     children.remove(element);
     element.setParent(null);
   }
+  public void clear() { children.clear(); }
   public void setWindow(Window w) {
     // Cascade down to give children a reference to root Window
     super.setWindow(w);
@@ -547,6 +556,7 @@ class Label extends Element {
 class Button extends DynamicContainer {
   private Label label = null;
   protected boolean pressed = false;
+  private int textSize = 14;
 
   public Button() {
     super();
@@ -562,10 +572,18 @@ class Button extends DynamicContainer {
   public void setColor(color c) {
     super.setColor(light(c));
   }
+  
+  public void setTextSize(int size) {
+    textSize = size;
+    if (label!=null)
+      label.setTextSize(size);
+    align();
+    shrink();
+  }
 
   public void setValue(String value) {
     label = new Label(value);
-    label.setTextSize(14);
+    label.setTextSize(textSize);
     getChildren().clear();
     add(label);
   }

@@ -130,6 +130,7 @@ class ConfigWindow extends Window {
     private class AcceptButton extends Button {
       public AcceptButton() {
         super("Save");
+        setTextSize(16);
       }
       public void action() {
         if (inDevList.getSelected() != null) {
@@ -146,6 +147,7 @@ class ConfigWindow extends Window {
     private class CancelButton extends Button {
       public CancelButton() {
         super("Cancel");
+        setTextSize(16);
       }
       public void action() {
         tracksWindow.show();
