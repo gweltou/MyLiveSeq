@@ -494,7 +494,7 @@ class TracksWindow extends Window {
     public void setColor(color c) {
       super.setColor(colMult(colNoise(colSat(c, 1.2), 14), 1.33));
     }
-        
+    
     public float getWidth() { return super.getWidth() * getScaleX(); }
     public float getHeight() { return super.getHeight() * getScaleY(); }
     
@@ -508,7 +508,7 @@ class TracksWindow extends Window {
         int tickCoord = round(pointerLocalX*24/getScaleX());
         int patternIdx = ((Container) getParent()).getChildren().indexOf(this);
         println("cut " +tickCoord + " " +patternIdx);
-        Pattern[] divided = midiManager.divide(pattern, tickCoord);
+        Pattern[] divided = pattern.divide(tickCoord);
         println(divided[0].getNotes());
         if (divided[1] != null) {
           Container parent = ((Container) getParent());
@@ -521,8 +521,10 @@ class TracksWindow extends Window {
     }
     public boolean mouseDragged(MouseEvent event) {
       // Drag only if no other element is being dragged
-      if (getDragged() == null)
+      if (getDragged() == null) {
         registerDragged(this);
+        return true;
+      }
 
       if (getDragged() == this) {
         if (getParent().getClass() == PatternContainer.class) {
@@ -552,11 +554,12 @@ class TracksWindow extends Window {
       rect(getX(), getY(), getWidth(), getHeight());
       
       // Draw notes
+      println(getX() + "  " + getY());
       for (MidiNote note : pattern.getNotes()) {
         int pitch = note.getPitch();
         float startX = getX() + note.getStart()*getScaleX()/24;
         float endX = getX() + note.getEnd()*getScaleX()/24;
-        line(startX, 64-0.5*pitch, endX, 64-0.5*pitch);
+        line(startX, getY()+64-0.5*pitch, endX, getY()+64-0.5*pitch);
       }
     }
   }

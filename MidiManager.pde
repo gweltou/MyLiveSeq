@@ -108,6 +108,40 @@ public class Pattern {
   public ArrayList<MidiNote> getNotes() {
     return midiNotes;
   }
+
+  public Pattern[] divide(long ticks) {
+    Pattern[] divided = new Pattern[2];
+    if (ticks >= getLength() || ticks <= 0) {
+      // ticks coordinate out of bounds
+      divided[0] = this;
+      return divided;
+    }
+    Pattern left = new Pattern();
+    left.setLength(ticks);
+    Pattern right = new Pattern();
+    right.setLength(getLength()-ticks);
+    for (MidiNote note : getNotes()) {
+      int pitch = note.getPitch();
+      int vel = note.getVelocity();
+      if (note.getStart() < ticks) {
+        // Add to left pattern and split last note
+        if (note.getEnd() >= ticks) {
+          // First part to the left
+          left.addNote(new MidiNote(pitch, vel, note.getStart(), ticks-note.getStart()));
+          // Second part to the right
+          right.addNote(new MidiNote(pitch, vel, 0, note.getEnd()-ticks));
+        } else {
+          left.addNote(note);
+        }
+      } else {
+        // Add to right pattern and offset by -ticks
+        right.addNote(new MidiNote(pitch, vel, note.getStart()-ticks, note.getDuration()));
+      }
+    }
+    divided[0] = left;
+    divided[1] = right;
+    return divided;
+  }
 }
 
 
@@ -212,36 +246,6 @@ public class MidiManager extends Thread {
     }
   }
 
-  public Pattern[] divide(Pattern pat, long ticks) {
-    Pattern[] divided = new Pattern[2];
-    if (ticks >= pat.getLength() || ticks <= 0) {
-      // ticks coordinate out of bounds
-      divided[0] = pat;
-      return divided;
-    }
-    Pattern left = new Pattern();
-    left.setLength(ticks);
-    Pattern right = new Pattern();
-    right.setLength(pat.getLength()-ticks);
-    for (MidiNote note : pat.getNotes()) {
-      if (note.getStart() < ticks) {
-        // Add to left pattern and crop last note
-        if (note.getEnd() >= ticks) {
-          long durTrim = ticks-note.getStart();
-          left.addNote(new MidiNote(note.getPitch(), note.getVelocity(), note.getStart(), durTrim));
-        } else {
-          left.addNote(note);
-        }
-      } else {
-        // Add to right pattern and offset by -ticks
-        right.addNote(new MidiNote(note.getPitch(), note.getVelocity(), note.getStart()-ticks, note.getDuration()));
-      }
-    }
-    divided[0] = left;
-    divided[1] = right;
-    return divided;
-  }
-
   public MidiDevice getInputDevice() { 
     return inputDevice;
   }
@@ -330,12 +334,12 @@ public class MidiManager extends Thread {
 
   public void setTransmitter(int input_device) {
     if (input_device == -1)
-    return;
+      return;
     if (transmitters.isEmpty())
-    getTransmitters();
+      getTransmitters();
 
     if (inputDevice != null)
-    inputDevice.close();
+      inputDevice.close();
 
     try {
       inputDevice = transmitters.get(input_device);
@@ -352,12 +356,12 @@ public class MidiManager extends Thread {
 
   public void setReceiver(int output_device) {
     if (output_device == -1)
-    return;
+      return;
     if (receivers.isEmpty())
-    getReceivers();
+      getReceivers();
 
     if (outputDevice != null)
-    outputDevice.close();
+      outputDevice.close();
 
     try {
       outputDevice = receivers.get(output_device);
@@ -546,9 +550,9 @@ public class MidiManager extends Thread {
 
     // Close Midi ports
     if (outputDevice != null)
-    outputDevice.close();
+      outputDevice.close();
     if (inputDevice != null)
-    inputDevice.close();
+      inputDevice.close();
   }
 
   public void doStop() {
