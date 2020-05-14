@@ -58,19 +58,18 @@ public class Pattern {
    */
   private final ArrayList<MidiEvent> midiEvents = new ArrayList();
   private final ArrayList<MidiNote> midiNotes = new ArrayList();
-  private long nTicks;
-  private int nRepeat = 1;
+  private long nTicks = 0;
 
-  public Pattern() {
+  public Pattern() { 
     this(24*32);
+  }
+  public Pattern(long ticks) {
+    setLength(ticks);
   }
   public Pattern(Pattern other) {
     setLength(other.getLength());
     midiNotes.addAll(other.getNotes());
     midiEvents.addAll(other.getEvents());
-  }
-  public Pattern(long ticks) {
-    setLength(ticks);
   }
 
   public void setLength(long ticks) { 
@@ -79,16 +78,11 @@ public class Pattern {
   public long getLength() {
     return nTicks;
   }
-  public long getRepeat() { 
-    return nRepeat;
-  }
   public void trimLength() {
-    println("trim");
     nTicks = 0;
     for (MidiNote note : midiNotes) {
-      if (note.getEnd() > nTicks) {
+      if (note.getEnd() > nTicks)
         nTicks = note.getEnd();
-      }
     }
   }
 
@@ -107,6 +101,23 @@ public class Pattern {
   }
   public ArrayList<MidiNote> getNotes() {
     return midiNotes;
+  }
+
+  public ArrayList<MidiEvent> asEvents(int channel, long offset) {
+    ArrayList<MidiEvent> events = new ArrayList();
+    for (MidiNote note : getNotes()) {
+      ShortMessage noteOn, noteOff;
+      try {
+        noteOn = new ShortMessage(ShortMessage.NOTE_ON, channel, note.getPitch(), note.getVelocity());
+        noteOff = new ShortMessage(ShortMessage.NOTE_OFF, channel, note.getPitch(), 0);
+        events.add(new MidiEvent(noteOn, offset+note.getStart()));
+        events.add(new MidiEvent(noteOff, offset+note.getEnd()));
+      } 
+      catch (InvalidMidiDataException e) {
+        e.printStackTrace();
+      }
+    }
+    return events;
   }
 
   public Pattern[] divide(long ticks) {
@@ -148,81 +159,123 @@ public class Pattern {
 
 public class MyTrack {
   /*
-     *  Paramètres :
+   *  Paramètres :
    *      Mute on/off
    *      Midi Channel
    *      Transpose Octave
    *      Transpose semi-tones
    */
-  private final int midiChannel;
+  private int midiChannel;
   private final ArrayList<Pattern> patterns = new ArrayList();
-  private int patternIndex;
-  private int patternRepeatCount;
-
+  private int patternIdx;
+  private long tickcount;
+  private boolean mute;
+  private int playmode;
+  static public final int EOT = 0;            // Stop at end of track
+  static public final int LOOP_TRACK = 1;     // Loop whole track
+  static public final int LOOP_PATTERN = 2;   // Loop current pattern
 
   public MyTrack() {
     midiChannel = 0;
-    patternIndex = 0;
-    patternRepeatCount = 0;
+    patternIdx = 0;
+    mute = false;
+    playmode = EOT;
+    tickcount = 0;
   }
 
   public void addPattern(Pattern pattern) {
     patterns.add(pattern);
+    println("MM: Pattern added to track " + this);
   }
-
+  public void addPattern(int idx, Pattern pattern) { 
+    patterns.add(idx, pattern);
+    println("MM: Pattern added to track " + this);
+  }
+  public void removePattern(Pattern pat) { 
+    patterns.remove(pat);
+    println("MM: Pattern removed from track " + this);
+  }
   public ArrayList<Pattern> getPatterns() {
     return patterns;
   }
 
-  public Pattern nextPattern() {
-    // No more patterns to play
-    if (patternIndex >= patterns.size())
-      return null;
+  public void setChannel(int chan) {
+    // Chan: midi channel from 0 to 15
+    midiChannel = chan;
+  }
+  public int getChannel() { 
+    return midiChannel;
+  }
 
-    Pattern next = patterns.get(patternIndex);
-    if (patternRepeatCount < next.getRepeat()) {
-      patternRepeatCount++;
-      return next;
+  public void mute() { 
+    mute=true;
+  }
+  public void unmute() { 
+    mute=false;
+  }
+
+  public void rewind() {
+    patternIdx = 0;
+    tickcount = 0;
+  }
+
+  public Pattern tick() {
+    // Return the pattern to be played when timing is right
+    // null otherwise
+    if (patternIdx < patterns.size()) {
+      if (tickcount == 0) {
+        // Return current pattern
+        tickcount++;
+        return patterns.get(patternIdx);
+      }
+
+      tickcount++;
+      if (tickcount >= patterns.get(patternIdx).getLength()) {
+        tickcount = 0;
+        if (playmode != LOOP_PATTERN)
+          patternIdx++;
+      }
+      if (playmode == LOOP_TRACK && patternIdx>=patterns.size()) {
+        patternIdx = 0;
+      }
     }
-
-    patternIndex++;
-    return next;
+    return null;
   }
 }
 
 
 
 public class MidiManager extends Thread {
-  private final PriorityQueue<MidiEvent> eventQueue;
   private final ArrayList<MyTrack> tracks = new ArrayList();
+  private final PriorityQueue<MidiEvent> eventQueue;
   private final ArrayList<MidiDevice> transmitters = new ArrayList();
   private final ArrayList<MidiDevice> receivers = new ArrayList();
   private MidiDevice inputDevice, outputDevice;
   private MyMidiReceiver midiIn;
   private Receiver midiOut;
-  private boolean stop;    // MidiManager stops when running is set to false
-  private final int[] activeNotesVel;
-  private final long[] activeNotesTime;
+  private boolean stopThread;    // MidiManager stops when stopThread is set to false
+  private final int[] activeNotesVel =  new int[128];
+  private final long[] activeNotesTime = new long[128];
+  private final boolean[] onNotes = new boolean[16*128];  // 16 midi channels, 128 pitches per channel
   public boolean running;
   public boolean recording;
   private Pattern pattern;
-  private boolean patternPlaying                  = false;
+  private boolean patternPlaying = false;
   private long patternStartTime;
   private long patternLength;
-  private long tickDuration;
   private long lastTickTime;
   private long localTicks;
   private long lastLocalTickTime;
   private long localTickDuration;
-  private final int tickResolution = 1; // Ticks default resolution is multiplied by this number
+  private long externalTickDuration;
+  private final int tickResolution = 96; // Pulse Per Quarter note
   private boolean clockSlave;
   private float bpm;
 
   public MidiManager() {
-    activeNotesVel = new int[128];
     Arrays.fill(activeNotesVel, 0);
-    activeNotesTime = new long[128];
     Arrays.fill(activeNotesTime, 0);
+    Arrays.fill(onNotes, false);
     eventQueue = new PriorityQueue(32, new EventComparator());
     inputDevice = null;
     outputDevice = null;
@@ -333,13 +386,12 @@ public class MidiManager extends Thread {
   }
 
   public void setTransmitter(int input_device) {
+    if (inputDevice != null)
+      inputDevice.close();
     if (input_device == -1)
       return;
     if (transmitters.isEmpty())
       getTransmitters();
-
-    if (inputDevice != null)
-      inputDevice.close();
 
     try {
       inputDevice = transmitters.get(input_device);
@@ -355,13 +407,14 @@ public class MidiManager extends Thread {
   }
 
   public void setReceiver(int output_device) {
+    if (outputDevice != null) {
+      stopAndRewind();
+      outputDevice.close();
+    }
     if (output_device == -1)
       return;
     if (receivers.isEmpty())
       getReceivers();
-
-    if (outputDevice != null)
-      outputDevice.close();
 
     try {
       outputDevice = receivers.get(output_device);
@@ -369,46 +422,78 @@ public class MidiManager extends Thread {
       midiOut = outputDevice.getReceiver();
       String desc = outputDevice.getDeviceInfo().getDescription();
       println("Périphérique de sortie Midi ouvert (" + desc + ")");
+      testNote();
     } 
     catch (MidiUnavailableException e) {
       println("Impossible d'ouvrir le périphérique de sortie Midi");
     }
   }
 
-  public void playNote(int channel, int pitch, int velocity, float duration) {
+  public void testNote() {
     try {
-      ShortMessage noteOn = new ShortMessage(ShortMessage.NOTE_ON, channel, pitch, velocity);
-      ShortMessage noteOff = new ShortMessage(ShortMessage.NOTE_OFF, channel, pitch, 0);
-      eventQueue.add(new MidiEvent(noteOn, localTicks));
-      long ticks = Math.round(duration * 24 * tickResolution);
-      eventQueue.add(new MidiEvent(noteOff, localTicks+ticks));
+      midiOut.send(new ShortMessage(ShortMessage.NOTE_ON, 60, 80), -1);
+      try {
+        Thread.sleep(400);
+      } 
+      catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+      midiOut.send(new ShortMessage(ShortMessage.NOTE_OFF, 60, 0), -1);
     } 
     catch (InvalidMidiDataException e) {
-      System.out.println("Invalid Midi Data");
+      e.printStackTrace();
     }
   }
 
   public void play() {
-    println("Playing started");
+    println("MM: Playing started");
     long now = System.currentTimeMillis();
     lastTickTime = now;
     lastLocalTickTime = now;
     running = true;
   }
-  public void playStop() {
-    println("Playing stopped");
+
+  public void stopAndRewind() {
+    println("MM: stop and rewind");
+    running = false;
+    // turn off remaining on notes to avoid stuck notes
+    for (int channel=0; channel<16; channel++) {
+      for (int pitch=0; pitch<128; pitch++) {
+        int idx = 128*channel + pitch;
+        if (onNotes[idx]) {
+          try {
+            midiOut.send(new ShortMessage(ShortMessage.NOTE_OFF, channel, pitch, 0), -1);
+          } 
+          catch (InvalidMidiDataException e) {
+            e.printStackTrace();
+          }
+          onNotes[idx] = false;
+        }
+      }
+    }
+    eventQueue.clear();
+    localTicks = 0;
+
+    for (MyTrack track : tracks) {
+      track.rewind();
+    }
+  }
+
+  public void addTrack(MyTrack track) { 
+    tracks.add(track);
+    println("MM: track added");
   }
 
   public void loadPattern(Pattern pattern) {
     this.pattern = pattern;
-    patternLength = pattern.getLength() * 24 * tickResolution;
+    patternLength = pattern.getLength() * tickResolution;
   }
 
   public void playPattern() {
     patternStartTime = localTicks;
     patternPlaying = true;
     running = true;
-    println("Pattern loop started");
+    println("MM: Pattern loop started");
   }
 
   public long getPatternTime() { 
@@ -422,7 +507,7 @@ public class MidiManager extends Thread {
   public void startRecording(Pattern pattern) {
     if (isRecording()) {
     } else {
-      println("Recording started");
+      println("MM: Recording started");
       this.pattern = pattern;
       recording = true;
       Arrays.fill(activeNotesVel, 0);
@@ -435,8 +520,8 @@ public class MidiManager extends Thread {
 
   public void setBpm(float newBpm) {
     bpm = newBpm;
-    tickDuration = Math.round(60000/(24 * bpm));   // 24 ticks per quarter-note
-    localTickDuration = Math.round(60000/(tickResolution * 24 * bpm));
+    externalTickDuration = Math.round(60000/(24 * bpm));   // 24 ticks per quarter-note
+    localTickDuration = Math.round(60000/(tickResolution * bpm));
   }
 
   public void update() {
@@ -444,16 +529,15 @@ public class MidiManager extends Thread {
     MidiEvent[] newEvents = (midiIn == null) ? null : midiIn.getEvents();
 
     // Send midiIn events to midiOut
-    if (midiOut != null) {
-      if (newEvents != null) {
-        for (MidiEvent event : newEvents) {
-          midiOut.send(event.getMessage(), -1);
-        }
+    if (midiOut != null && newEvents != null) {
+      for (MidiEvent event : newEvents) {
+        midiOut.send(event.getMessage(), -1);
       }
     }
 
-    // Clock is ticking
     if (isRunning()) {
+      //print('.');
+      // Manage clock
       if (!clockSlave) {
         long now = System.currentTimeMillis();
         // Update local ticks (may have a greater resolution that default Midi ticks)
@@ -461,7 +545,7 @@ public class MidiManager extends Thread {
           localTicks += 1;
           lastLocalTickTime += localTickDuration;
         }
-        if ((midiOut != null) && (now - lastTickTime > tickDuration)) {
+        if ((midiOut != null) && (now - lastTickTime > externalTickDuration)) {
           // Send clock tick to external hardware/software
           try {
             ShortMessage tickMessage = new ShortMessage(ShortMessage.TIMING_CLOCK);
@@ -469,7 +553,7 @@ public class MidiManager extends Thread {
           } 
           catch (InvalidMidiDataException ignored) {
           }
-          lastTickTime += tickDuration;
+          lastTickTime += externalTickDuration;
         }
       }
 
@@ -529,17 +613,36 @@ public class MidiManager extends Thread {
         }
       }
 
+      // Song mode
+      if (!patternPlaying) {
+        for (MyTrack t : tracks) {
+          Pattern toPlay = t.tick();
+          if (toPlay != null) {
+            eventQueue.addAll(toPlay.asEvents(t.getChannel(), localTicks));
+          }
+        }
+      }
+
       // Send queued Midi events to midiOut
       while (!eventQueue.isEmpty() && eventQueue.peek().getTick() <= localTicks) {
-        midiOut.send(eventQueue.poll().getMessage(), -1);
+        ShortMessage nextMessage = (ShortMessage) eventQueue.poll().getMessage();
+        if ((nextMessage.getStatus()&0xF0) == ShortMessage.NOTE_ON) {
+          // Register note on (used to cleanly turn notes off when needed)
+          int channel = ((ShortMessage) nextMessage).getChannel();
+          int pitch = ((ShortMessage) nextMessage).getData1();
+          onNotes[128*channel + pitch] = true;
+        }
+        if (midiOut != null)
+          midiOut.send(nextMessage, -1);
+        //print('*');
       }
     }
   }
 
   public void run () {
     println("Midi manager started...");
-    stop = false;
-    while (!stop) {
+    stopThread = false;
+    while (!stopThread) {
       update();
       try {
         Thread.sleep(2L);
@@ -555,8 +658,8 @@ public class MidiManager extends Thread {
       inputDevice.close();
   }
 
-  public void doStop() {
-    stop = true;
+  public void shutdown() {
+    stopThread = true;
   }
 
   //public void saveToFile(File outputFile) {
@@ -578,31 +681,40 @@ public class MidiManager extends Thread {
   //}
 
 
-  public ArrayList<MidiNote>[] parseEvents(Track track) {
+  public ArrayList<MidiNote>[] parseEvents(Track track, int ppq) {
+    float timeScale = (float) tickResolution / ppq;
+    // Separate midi events over 16 channels
     ArrayList<MidiNote>[] notes = new ArrayList[16];
-    long[][] notesOn = new long[128][16];
     for (int i=0; i<16; i++) {
       notes[i] = new ArrayList();
-      Arrays.fill(notesOn[i], -1);
     }
+    long[] notesOnTick = new long[128*16];
+    Arrays.fill(notesOnTick, -1);
+    int[] notesOnVel = new int[128*16];
+    Arrays.fill(notesOnVel, 0);
 
     for (int i=0; i<track.size(); i++) {
       MidiEvent event = track.get(i);
-      int status = event.getMessage().getStatus();
+      int status = event.getMessage().getStatus() & 0xF0;
       if (status == ShortMessage.NOTE_ON || status == ShortMessage.NOTE_OFF) {
         ShortMessage message = (ShortMessage) event.getMessage();
         int command = message.getCommand();
         int channel = message.getChannel();
         if (command == ShortMessage.NOTE_ON) {
           int pitch = message.getData1();
-          notesOn[pitch][channel] = event.getTick();
+          notesOnTick[channel*128+pitch] = event.getTick();
+          notesOnVel[channel*128+pitch] = message.getData2();
         } else if (command == ShortMessage.NOTE_OFF) {
-          int pitch = ((ShortMessage) event.getMessage()).getData1();
-          long duration = event.getTick() - notesOn[pitch][channel];
-          int velocity = ((ShortMessage) event.getMessage()).getData2();
-          notes[channel].add(new MidiNote(pitch, velocity, event.getTick(), duration));
+          int pitch = message.getData1();
+          long start = Math.round(notesOnTick[channel*128+pitch]*timeScale);
+          long duration = Math.round((event.getTick()-notesOnTick[channel*128+pitch])*timeScale);
+          int velocity = notesOnVel[channel*128+pitch];
+          notes[channel].add(new MidiNote(pitch, velocity, start, duration));
         }
       }
+    }
+    for (int i=0; i<16; i++) {
+      println(i + " " + notes[i]);
     }
     return notes;
   }
@@ -616,12 +728,14 @@ public class MidiManager extends Thread {
 
     try {
       MidiFileFormat format = MidiSystem.getMidiFileFormat(inputFile);
+      int ppq = format.getResolution();
       println("File type : " + format.getType());
+      println("      ppq : " + format.getResolution());
       Sequence seq = MidiSystem.getSequence(inputFile);
       for (Track track : seq.getTracks()) {
-        println("track");
         // Convert from midi file tracks to this sequencer track format
-        ArrayList<MidiNote>[] arrays = parseEvents(track);
+        ArrayList<MidiNote>[] arrays = parseEvents(track, ppq);
+        println("track");
         for (int i=0; i<16; i++) {
           if (!arrays[i].isEmpty()) {
             Pattern newPattern = new Pattern();

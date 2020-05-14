@@ -7,6 +7,7 @@ static final int ALIGN_COLUMN = 2;
 static final int ALIGN_HORIZONTALLY = 4;
 static final int ALIGN_VERTICALLY = 8;
 static final int ALIGN_RIGHT = 16;
+static final int ALIGN_TOP = 32;
 
 
 
@@ -296,7 +297,7 @@ class Container extends Element {
       }
     }
     if ((align & ALIGN_COLUMN) != 0) {
-      y = getPadding();
+      y = 0;
       for (Element child : getChildren()) {
         child.setY(y);
         y += child.getHeight() + spacing;
@@ -315,10 +316,15 @@ class Container extends Element {
       }
     }
     if ((align & ALIGN_RIGHT) != 0) {
-      float w = getWidth()-getPadding();
+      float w = getWidth();
       for (Element child : getChildren()) {
         x = child.getX() + w-child.getWidth();
         child.setX(x);
+      }
+    }
+    if ((align & ALIGN_TOP) != 0) {
+      for (Element child : getChildren()) {
+        child.setY(0);
       }
     }
   }
@@ -457,7 +463,6 @@ class DynamicContainer extends Container {
     setDirty(true);
   }
   public void refresh() {
-    println("refres");
     // Force updating size, used when isDirty tag is not possible
     for (Element child : getChildren()) {
       child.refresh();

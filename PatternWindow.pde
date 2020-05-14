@@ -30,6 +30,10 @@ class PatternWindow extends Window {
       setSize(width, getHeight());
     }
     
+    private class offsetButton extends Button {
+      
+    }
+    
     private class ButtonEdit extends Button {
       public ButtonEdit() {
         super("Edit");

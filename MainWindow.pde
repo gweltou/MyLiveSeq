@@ -52,7 +52,7 @@ class ToolBar extends DynamicContainer {
       super(s);
     }
     public void action() {
-      midiManager.playStop();
+      midiManager.stopAndRewind();
     }
   }
 }
@@ -114,7 +114,9 @@ class TracksWindow extends Window {
     centerPane.add(tracksContainer);
     clearTracks();
     for (int nt=0; nt<3; nt++) {
-      addTrack(new TrackContainer());
+      MyTrack newTrack = new MyTrack();
+      midiManager.addTrack(newTrack);
+      addTrack(new TrackContainer(newTrack));
     }
     
     tracksContainer.setPos(10, 100);
@@ -136,8 +138,8 @@ class TracksWindow extends Window {
     }
   }
   
-  public void addTrack(TrackContainer track) {
-    tracksContainer.add(tracksContainer.getChildren().size()-1, track);
+  public void addTrack(TrackContainer trackContainer) {
+    tracksContainer.add(tracksContainer.getChildren().size()-1, trackContainer);
   }
   public void clearTracks() {
     tracksContainer.clear();
@@ -152,6 +154,12 @@ class TracksWindow extends Window {
     } else if (event.getKey() == 'z') {
       setScaleX(getScaleX()*2);
       tracksContainer.refresh();
+    } else if (event.getKey() == DELETE) {
+      if (getSelected().getClass() == PatternUI.class && getDragged() == null) {
+        PatternUI pattern = (PatternUI) getSelected();
+        pattern.getTrackUI().removePattern(pattern);
+        println("del");
+      }
     }
     return false;
   }
@@ -165,12 +173,13 @@ class TracksWindow extends Window {
       super("Add");
     }
     public void action() {
-      TrackContainer track = new TrackContainer();
-      tracksContainer.add(tracksContainer.getChildren().size()-1, track);
-      PatternUI pat = new PatternUI(new Pattern());
-      track.addPattern(pat);
-      pat.setColorFixed();
-      getWindow().registerSelected(pat);
+      MyTrack track = new MyTrack();
+      track.addPattern(new Pattern());
+      midiManager.addTrack(track);
+      TrackContainer tc = new TrackContainer(track);
+      tracksContainer.add(tracksContainer.getChildren().size()-1, tc);
+      
+      getWindow().registerSelected(tc.getChildren().get(0));
     }
   }
   
@@ -259,16 +268,13 @@ class TracksWindow extends Window {
       }
       
       public void action() {
-        File inputFile = new File("/home/gweltaz/Dropbox/Projets/Informatique/MyLiveSeq/test2.mid");
+        File inputFile = new File("/home/gweltaz/Dropbox/Projets/Informatique/MyLiveSeq/FF7prelu.mid");
         ArrayList<MyTrack> tracks = midiManager.loadMidiFile(inputFile);
         clearTracks();
         for (MyTrack track : tracks) {
           if (track.getPatterns().isEmpty())
             break;
-          TrackContainer tc = new TrackContainer();
-          for (Pattern pattern : track.getPatterns()) {
-            tc.addPattern(new PatternUI(pattern));
-          }
+          TrackContainer tc = new TrackContainer(track);
           addTrack(tc);
         }
       }
@@ -281,12 +287,14 @@ class TracksWindow extends Window {
    ***************************************************/
   class TrackContainer extends DynamicContainer {
     // Container for a single Track
+    private MyTrack track;
     private DynamicContainer msButtons;
     private PatternContainer patterns;
     private DynamicContainer addButtons;
 
-    public TrackContainer() {
+    public TrackContainer(MyTrack track) {
       super();
+      this.track = track;
       setAlign(ALIGN_ROW);
       
       // Left toggle buttons (mute, solo, loop)
@@ -310,8 +318,12 @@ class TracksWindow extends Window {
       loopToggle.setColorFixed(color(240, 240, 0));
       
       // Patterns
-      patterns = new PatternContainer();
+      patterns = new PatternContainer(track);
       add(patterns);
+      // Add existing patterns in track
+      for (Pattern p : track.getPatterns()) {
+        patterns.add(new PatternUI(p));
+      }
       
       // Add New Pattern Buttons
       addButtons = new DynamicContainer();
@@ -328,19 +340,33 @@ class TracksWindow extends Window {
       }
       public void action() {
         println("action");
-        PatternUI newPattern = new PatternUI(new Pattern());
-        addPattern(newPattern);
-        newPattern.setColorFixed();
+        Pattern newPattern = new Pattern();
+        track.addPattern(newPattern);
+        PatternUI patUI = new PatternUI(newPattern);
+        patUI.setColorFixed();
+        addPattern(patUI);
       }
     }
     
-    public void addPattern(PatternUI pattern) {
-      println("pattern added");
-      patterns.add(pattern);
+    public void addPattern(PatternUI patternUI) {
+      println("UI: pattern added");
+      patterns.add(patternUI);
+      track.addPattern(patternUI.getPattern());
+      align();
+      shrink();
     }
-    public void addPattern(int idx, PatternUI pattern) {
-      println("pattern added");
-      patterns.add(idx, pattern);
+    public void addPattern(int idx, PatternUI patternUI) {
+      println("UI: pattern added");
+      patterns.add(idx, patternUI);
+      track.addPattern(idx, patternUI.getPattern());
+      align();
+      shrink();
+    }
+    public void removePattern(PatternUI patternUI) {
+      patterns.remove(patternUI);
+      track.removePattern(patternUI.getPattern());
+      align();
+      shrink();
     }
     
     public void setColor(color c) {
@@ -356,37 +382,13 @@ class TracksWindow extends Window {
     private boolean dropable = false;
     private float spacerIndex;
     private float spacerWidth = 32;
+    private MyTrack track;
     
-    public PatternContainer() {
+    public PatternContainer(MyTrack track) {
       super();
       setMinSize(16, 64);
-      setAlign(ALIGN_ROW);
-    }
-    
-    public void add(Element pattern) {
-      pattern.setY(0);
-      super.add(pattern);
-      ((DynamicContainer) getParent()).align();
-      ((DynamicContainer) getParent()).shrink();
-    }
-    public void add(int idx, Element pattern) {
-      pattern.setY(0);
-      super.add(idx, pattern);
-      ((DynamicContainer) getParent()).align();
-      ((DynamicContainer) getParent()).shrink();
-    }
-    public void remove(PatternUI pattern) {
-      super.remove(pattern);
-      
-      // Delete whole track if empty
-      if (getChildren().size() == 0) {
-        if (getSelected() == this)
-          unregisterSelected();
-        tracksContainer.remove(this.getParent());
-      }
-      
-      ((DynamicContainer) getParent()).align();
-      ((DynamicContainer) getParent()).shrink();
+      setAlign(ALIGN_ROW + ALIGN_TOP);
+      this.track = track;
     }
     
     public float getWidth() {
@@ -411,9 +413,10 @@ class TracksWindow extends Window {
         ArrayList<Element> patterns = getChildren();
         for (int i=0; i<=patterns.size(); i++) {
           if (i==patterns.size() || pointerLocalX < rightBoundary+patterns.get(i).getWidth()/2) {
+            // Remove from parent
             ((Container) dragged.getParent()).remove(dragged);
             // Insert element in position
-            this.add(i, dragged);
+            ((TrackContainer) getParent()).addPattern(i, (PatternUI) dragged);
             unregisterDragged();
             registerSelected(dragged);
             dropable = false;
@@ -491,6 +494,15 @@ class TracksWindow extends Window {
       setSize(p.getLength()/24, 64);
     }
     
+    public Pattern getPattern() { return pattern; }
+    
+    public TrackContainer getTrackUI() {
+      if (getParent() != null && getParent().getClass() == PatternContainer.class) {
+        return (TrackContainer) (getParent().getParent());
+      }
+      return null;
+    }
+    
     public void setColor(color c) {
       super.setColor(colMult(colNoise(colSat(c, 1.2), 14), 1.33));
     }
@@ -502,19 +514,16 @@ class TracksWindow extends Window {
       registerSelected(this);
       
       // Cut pattern in two if CTRL key is down
-      if(event.isControlDown()) {
+      if(getTrackUI()!=null && event.isControlDown()) {
         float pointerLocalX = event.getX()-getAbsoluteX();
         // coordinate unit is 24ticks
         int tickCoord = round(pointerLocalX*24/getScaleX());
         int patternIdx = ((Container) getParent()).getChildren().indexOf(this);
-        println("cut " +tickCoord + " " +patternIdx);
         Pattern[] divided = pattern.divide(tickCoord);
-        println(divided[0].getNotes());
         if (divided[1] != null) {
-          Container parent = ((Container) getParent());
-          parent.remove(this);
-          parent.add(patternIdx, new PatternUI(divided[0]));
-          parent.add(patternIdx+1, new PatternUI(divided[1]));
+          getTrackUI().addPattern(patternIdx, new PatternUI(divided[0]));
+          getTrackUI().addPattern(patternIdx+1, new PatternUI(divided[1]));
+          getTrackUI().removePattern(this);
         }
       }
       return true;
@@ -528,10 +537,19 @@ class TracksWindow extends Window {
 
       if (getDragged() == this) {
         if (getParent().getClass() == PatternContainer.class) {
-          // Detach from parent TrackContainer
-          ((PatternContainer) getParent()).remove(this);
-          // Add pattern to centerPane
-          centerPane.add(this);
+          if (event.isShiftDown()) {
+            PatternUI copy = new PatternUI(new Pattern(pattern));
+            registerDragged(copy);
+            copy.setX(getAbsoluteX());
+            copy.setY(getAbsoluteY());
+            centerPane.add(copy);
+          } else {
+            // Detach from parent TrackContainer
+            getTrackUI().removePattern(this);
+            // Add pattern to centerPane
+            // TODO : save absolute pos before removing from parent
+            centerPane.add(this);
+          }
         } else if (getParent().getClass() == TracksDragPane.class) {
           // Center on mouse cursor
           setX(mouseX-getWidth()/2);
@@ -554,7 +572,7 @@ class TracksWindow extends Window {
       rect(getX(), getY(), getWidth(), getHeight());
       
       // Draw notes
-      println(getX() + "  " + getY());
+      stroke(darker);
       for (MidiNote note : pattern.getNotes()) {
         int pitch = note.getPitch();
         float startX = getX() + note.getStart()*getScaleX()/24;
