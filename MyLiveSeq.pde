@@ -6,7 +6,8 @@ color bgcolor = color(245);
 
 
 void setup() {
-  size(900, 600);
+  size(600, 600);
+  //frameRate(1);
   rectMode(CORNER);
   ellipseMode(CORNER);
   
@@ -20,7 +21,7 @@ void setup() {
 
 
 void draw() {
-  background(bgcolor);
+  //background(bgcolor);
   ui.render();
 }
 

@@ -433,7 +433,7 @@ public class MidiManager extends Thread {
     try {
       midiOut.send(new ShortMessage(ShortMessage.NOTE_ON, 60, 80), -1);
       try {
-        Thread.sleep(400);
+        Thread.sleep(200);
       } 
       catch (InterruptedException e) {
         e.printStackTrace();

@@ -1,6 +1,8 @@
 import java.util.concurrent.Callable;
 
 static final boolean DEBUG = false;
+static final boolean LAZY_RENDERING = true;
+
 
 static final int ALIGN_ROW = 1;
 static final int ALIGN_COLUMN = 2;
@@ -91,14 +93,12 @@ class Element {
   public boolean sizeFixed;
   private float posX = 0;
   private float posY = 0;
-  private float scaleX = 1.0f;
-  private float scaleY = 1.0f;
   private float width;
   private float height;
-  private boolean dirty = false; // If size has changed
+  private boolean sizeDirty = false; // If size has changed
+  private boolean renderDirty = true;
 
-  public Element() {
-  }
+  public Element() { }
 
   public float getX() { return posX; }
   public float getY() { return posY; }
@@ -119,13 +119,21 @@ class Element {
   public void setSizeFixed() { sizeFixed=true; }
   public void setSizeFixed(float w, float h) { setSize(w, h); sizeFixed=true; }
   public void updateSize() { }
-  public boolean isDirty() { 
+  public boolean isSizeDirty() { 
     if (sizeFixed)
       return false;
-    return dirty;
+    return sizeDirty;
   }
-  public void setDirty(boolean t) { dirty=t; }
   public void refresh() { }
+  public void setSizeDirty(boolean t) { sizeDirty=t; }
+  public boolean isRenderDirty() { return renderDirty; }
+  public void setRenderDirty() {
+    renderDirty=true;
+    // Dirty state needs to be passed up
+    if (getParent() != null)
+      getParent().setRenderDirty();
+  }
+  public void unsetRenderDirty() { renderDirty=false; }
   public void setColor(color c) { 
     if (!colorFixed) {
       col = c;
@@ -143,15 +151,16 @@ class Element {
     colorFixed=true;
   }
 
+  public float getPadding() { return 0; }
   public float getAbsoluteX() {
-    if (parent == null)
+    if (getParent() == null)
       return getX();
-    return parent.getAbsoluteX() + getX();
+    return getParent().getAbsoluteX() + getParent().getPadding() + getX();
   }
   public float getAbsoluteY() {
-    if (parent == null)
+    if (getParent() == null)
       return getY();
-    return parent.getAbsoluteY() + getY();
+    return getParent().getAbsoluteY() + getParent().getPadding() + getY();
   }
 
   public boolean containsAbsolutePoint(float x, float y) {
@@ -176,11 +185,7 @@ class Element {
   public void setWindow(Window w) { window=w;}
   public Window getWindow() { return window; }
   
-  public void render() {
-    fill(col);
-    noStroke();
-    rect(getX(), getY(), getWidth(), getHeight());
-  }
+  public void render() { unsetRenderDirty(); }
   public boolean keyPressed(KeyEvent e) { return false; }
   public boolean mousePressed(MouseEvent e) { return false; }
   public boolean mouseReleased(MouseEvent e) { return false; }
@@ -217,6 +222,7 @@ class Window extends Container {
 
   public void show() { 
     ui.setWindow(this);
+    super.render();
   }
 
   public boolean mouseReleased(MouseEvent event) {
@@ -252,16 +258,19 @@ class Container extends Element {
   public void add(Element element) {
     children.add(element);
     element.setParent(this);
+    setRenderDirty();
   }
   public void add(int idx, Element element) {
     children.add(idx, element);
     element.setParent(this);
+    setRenderDirty();
   }
   public void remove(Element element) {
     children.remove(element);
     element.setParent(null);
+    setRenderDirty();
   }
-  public void clear() { children.clear(); }
+  public void clear() { children.clear(); setRenderDirty(); }
   public void setWindow(Window w) {
     // Cascade down to give children a reference to root Window
     super.setWindow(w);
@@ -278,7 +287,7 @@ class Container extends Element {
     }
   }
   
-  public void setSpacing(float s) { spacing=s; }
+  public void setSpacing(float s) { spacing=s;}
   public void setPadding(float p) { padding=p; }
   public float getPadding() { return padding; }
   public void setAlign(int align) { 
@@ -290,7 +299,7 @@ class Container extends Element {
   public void align() {
     float x, y;
     if ((align & ALIGN_ROW) != 0) {
-      x = getPadding();
+      x = 0;
       for (Element child : getChildren()) {
         child.setX(x);
         x += child.getWidth() + spacing;
@@ -327,6 +336,7 @@ class Container extends Element {
         child.setY(0);
       }
     }
+    //setRenderDirty();
   }
 
   public boolean mousePressed(MouseEvent event) {
@@ -370,11 +380,33 @@ class Container extends Element {
     return accepted;
   }
 
+  public void renderDirty() {
+    super.render();
+    pushMatrix();
+    translate(getX()+getPadding(), getY()+getPadding());
+    if (LAZY_RENDERING) {
+      for (Element child : children) {
+        if (child.isRenderDirty()) {
+          child.render();
+          renderCount++;
+        }
+      }
+    } else {
+      for (Element child : children) {
+        child.render();
+        renderCount++;
+      }
+    }
+    popMatrix();
+  }
   public void render() {
+    // Render all children, even if not renderDirty
+    super.render();
     pushMatrix();
     translate(getX()+getPadding(), getY()+getPadding());
     for (Element child : children) {
       child.render();
+      renderCount++;
     }
     popMatrix();
   }
@@ -422,30 +454,30 @@ class DynamicContainer extends Container {
   }
   /*
   public float getAbsoluteX() {
-    if (dirty)
+    if (isSizeDirty())
       updateSize();
     return super.getAbsoluteX() + getPadding();
   }
   public float getAbsoluteY() {
-    if (dirty)
+    if (isSizeDirty())
       updateSize();
     return super.getAbsoluteY() + getPadding();
   }*/
   
   public void setSize(float x, float y) { 
     super.setSize(x, y); 
-    setDirty(false);
+    setSizeDirty(false);
   }
   public void setMinSize(float x, float y) { 
     minWidth=x; 
     minHeight=y;
-    setDirty(false);
+    setSizeDirty(false);
   }
 
   public void align() {
     if (getAlign() != 0) {
       super.align();
-      setDirty(true);
+      setSizeDirty(true);
     }
   }
   
@@ -460,13 +492,13 @@ class DynamicContainer extends Container {
     for (Element child : getChildren()) {
       child.setPos(child.getX()-xoff, child.getY()-yoff);
     }
-    setDirty(true);
+    setSizeDirty(true);
   }
   public void refresh() {
-    // Force updating size, used when isDirty tag is not possible
+    // Force updating size, used when checking isSizeDirty tag is not possible
     for (Element child : getChildren()) {
       child.refresh();
-      child.setDirty(true);
+      child.setSizeDirty(true);
     }
     align();
     //shrink();
@@ -481,7 +513,7 @@ class DynamicContainer extends Container {
 
     for (Element child : getChildren()) {
       // Recursively ask every child to update their own size
-      if (child.isDirty())
+      if (child.isSizeDirty())
         child.updateSize();
       
       if (child.getX()+child.getWidth() > maxWidth)
@@ -490,7 +522,7 @@ class DynamicContainer extends Container {
         maxHeight = child.getY()+child.getHeight();
     }
     setSize(maxWidth+2*getPadding(), maxHeight+2*getPadding());
-    setDirty(false);
+    setSizeDirty(false);
   }
 }
 
@@ -513,16 +545,17 @@ class DragPane extends Container {
         child.setX(child.getX() + dx);
         child.setY(child.getY() + dy);
       }
+      setRenderDirty();
       return false;
     }
     return super.mouseDragged(event);
   }
 
   public void render() {
-    pushMatrix();
-    translate(getX(), getY());
+    noStroke();
+    fill(250);
+    rect(getX(), getY(), getWidth(), getHeight());
     super.render();
-    popMatrix();
   }
 }
 
@@ -544,6 +577,7 @@ class Label extends Element {
   public void setValue(String s) {
     value = s;
     //setSize(textWidth(s), textAscent());
+    setRenderDirty();
   }
   public void setColor(color c) {
     super.setColor(darker(c));
@@ -553,9 +587,11 @@ class Label extends Element {
     textWeight=weight;
     textSize(textWeight);
     setSize(textWidth(value), textAscent());
+    setRenderDirty();
   }
 
   public void render() {
+    super.render();
     textSize(textWeight);
     fill(dark);
     pushMatrix();
@@ -607,8 +643,8 @@ class Button extends DynamicContainer {
 
   public void action() { }
 
-  public void press() { pressed = true; }
-  public void release() { pressed = false; }
+  public void press() { pressed = true; setRenderDirty(); }
+  public void release() { pressed = false; setRenderDirty(); }
 
   public boolean mousePressed(MouseEvent event) {
     if (event.getButton() == LEFT) {
@@ -632,7 +668,6 @@ class Button extends DynamicContainer {
     noStroke();
     fill(pressed ? dark : col);
     rect(getX(), getY(), getWidth(), getHeight(), 6);
-    
     // Draw Children
     super.render();
     
@@ -717,6 +752,7 @@ class ToggleLed extends ToggleButton {
       //fill(getParent().dark);
       //ellipse(getX()+2, getY()+2, getWidth()-4, getHeight()-4);
     }
+    unsetRenderDirty();
   }
 }
 
@@ -765,6 +801,7 @@ class TriStateButton extends ToggleButton {
     default: 
       break;
     }
+    unsetRenderDirty();
   }
 }
 
@@ -784,7 +821,7 @@ public class Knob extends Element {
     setAngleBoundaries(PI-0.8, TWO_PI+0.8);
   }
   
-  public void setAngle(float a) { angle=a; }
+  public void setAngle(float a) { angle=a; setRenderDirty(); }
   public void setAngleBoundaries(float min, float max) {
     minAngle = min;
     maxAngle = max;
@@ -793,6 +830,7 @@ public class Knob extends Element {
   public float getMaxAngle() { return maxAngle; }
   
   public void render() {
+    super.render();
     stroke(dark);
     strokeWeight(5);
     noFill();
@@ -853,6 +891,7 @@ public class Controller extends DynamicContainer {
     valueLabel.setValue(String.valueOf(round(rawValue)));
     float angle = map(round(rawValue), minValue, maxValue, knob.getMinAngle(), knob.getMaxAngle());
     knob.setAngle(-angle);
+    setRenderDirty();
   }
   
   public boolean mouseDragged(MouseEvent event) {

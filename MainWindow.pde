@@ -92,7 +92,7 @@ class BottomBar extends Container {
 }
 
 
-
+int renderCount;
 /***************************************************
  ***************** TRACKS WINDOW *******************
  ***************************************************/
@@ -107,7 +107,6 @@ class TracksWindow extends Window {
     setColor(color(127));
         
     centerPane = new TracksDragPane();
-    centerPane.setSize(width, height);
     add(centerPane);
     
     tracksContainer = new DynamicContainer();
@@ -119,7 +118,7 @@ class TracksWindow extends Window {
       addTrack(new TrackContainer(newTrack));
     }
     
-    tracksContainer.setPos(10, 100);
+    tracksContainer.setPos(10, 16);
     tracksContainer.setSpacing(2);
     tracksContainer.setAlign(ALIGN_COLUMN);
     
@@ -128,14 +127,24 @@ class TracksWindow extends Window {
     
     TracksBottomBar bottomBar = new TracksBottomBar();
     add(bottomBar);
+    
+    centerPane.setY(toolBar.getHeight()+1.6);
+    centerPane.setSizeFixed(width, height-toolBar.getHeight()-bottomBar.getHeight()-2);
   }
   
   public void render() {
-    super.render();
-    // Draw dragged Element on top of everything
-    if (getDragged() != null && getDragged().getClass()==PatternUI.class) {
-      getDragged().render();
+    renderCount = 0;
+    if (centerPane.isRenderDirty()) {
+      super.render();
+    } else {
+      super.renderDirty();
     }
+    // Draw dragged Element on top of everything
+    //if (getDragged() != null && getDragged().getClass()==PatternUI.class) {
+    //  getDragged().render();
+    //}
+    //if (renderCount > 0)
+      //println("renderCount: " + renderCount);
   }
   
   public void addTrack(TrackContainer trackContainer) {
@@ -143,7 +152,7 @@ class TracksWindow extends Window {
   }
   public void clearTracks() {
     tracksContainer.clear();
-    tracksContainer.add(new ButtonAdd());
+    tracksContainer.add(new ButtonAddTrack());
   }
   
   public boolean keyPressed(KeyEvent event) {
@@ -151,14 +160,17 @@ class TracksWindow extends Window {
     if (event.getKey() == 'a') {
       setScaleX(getScaleX()/2);
       tracksContainer.refresh();
+      centerPane.setRenderDirty();
     } else if (event.getKey() == 'z') {
       setScaleX(getScaleX()*2);
       tracksContainer.refresh();
+      centerPane.setRenderDirty();
     } else if (event.getKey() == DELETE) {
       if (getSelected().getClass() == PatternUI.class && getDragged() == null) {
         PatternUI pattern = (PatternUI) getSelected();
         pattern.getTrackUI().removePattern(pattern);
         println("del");
+        centerPane.setRenderDirty();
       }
     }
     return false;
@@ -166,10 +178,10 @@ class TracksWindow extends Window {
   
   
   /***************************************************
-   ******************* ADD BUTTON ********************
+   **************** ADD TRACK BUTTON *****************
    ***************************************************/
-  private class ButtonAdd extends Button {
-    public ButtonAdd() {
+  private class ButtonAddTrack extends Button {
+    public ButtonAddTrack() {
       super("Add");
     }
     public void action() {
@@ -318,7 +330,7 @@ class TracksWindow extends Window {
       loopToggle.setColorFixed(color(240, 240, 0));
       
       // Patterns
-      patterns = new PatternContainer(track);
+      patterns = new PatternContainer();
       add(patterns);
       // Add existing patterns in track
       for (Pattern p : track.getPatterns()) {
@@ -343,8 +355,8 @@ class TracksWindow extends Window {
         Pattern newPattern = new Pattern();
         track.addPattern(newPattern);
         PatternUI patUI = new PatternUI(newPattern);
-        patUI.setColorFixed();
         addPattern(patUI);
+        patUI.setColorFixed();
       }
     }
     
@@ -375,6 +387,26 @@ class TracksWindow extends Window {
   }
   
   
+  
+  /***************************************************
+   ***************** TRACKS DRAG PANE ****************
+   ***************************************************/
+  class TracksDragPane extends DragPane {
+    public TracksDragPane() {
+      super();
+    }
+    
+    public boolean mouseClicked(MouseEvent event) {
+      boolean accepted = super.mouseClicked(event);
+      if (accepted == false) {
+        unregisterSelected();
+      }
+      return accepted;
+    }
+  }
+  
+  
+  
   /***************************************************
    **************** PATTERNS CONTAINER ***************
    ***************************************************/
@@ -382,13 +414,13 @@ class TracksWindow extends Window {
     private boolean dropable = false;
     private float spacerIndex;
     private float spacerWidth = 32;
-    private MyTrack track;
+    //private MyTrack track;
     
-    public PatternContainer(MyTrack track) {
+    public PatternContainer() {
       super();
       setMinSize(16, 64);
       setAlign(ALIGN_ROW + ALIGN_TOP);
-      this.track = track;
+      //this.track = track;
     }
     
     public float getWidth() {
@@ -460,26 +492,11 @@ class TracksWindow extends Window {
         child.render();
       }
       popMatrix();
+      unsetRenderDirty();
     }
   }
   
   
-  /***************************************************
-   ***************** TRACKS DRAG PANE ****************
-   ***************************************************/
-  class TracksDragPane extends DragPane {
-    public TracksDragPane() {
-      super();
-    }
-    
-    public boolean mouseClicked(MouseEvent event) {
-      boolean accepted = super.mouseClicked(event);
-      if (accepted == false) {
-        unregisterSelected();
-      }
-      return accepted;
-    }
-  }
 
   /***************************************************
    ******************   PATTERN_UI   *****************
@@ -526,6 +543,7 @@ class TracksWindow extends Window {
           getTrackUI().removePattern(this);
         }
       }
+      setRenderDirty();
       return true;
     }
     public boolean mouseDragged(MouseEvent event) {
@@ -538,6 +556,7 @@ class TracksWindow extends Window {
       if (getDragged() == this) {
         if (getParent().getClass() == PatternContainer.class) {
           if (event.isShiftDown()) {
+            // Copy this pattern
             PatternUI copy = new PatternUI(new Pattern(pattern));
             registerDragged(copy);
             copy.setX(getAbsoluteX());
@@ -545,15 +564,20 @@ class TracksWindow extends Window {
             centerPane.add(copy);
           } else {
             // Detach from parent TrackContainer
+            float x = getAbsoluteX();
+            float y = getAbsoluteY();
             getTrackUI().removePattern(this);
             // Add pattern to centerPane
-            // TODO : save absolute pos before removing from parent
             centerPane.add(this);
+            setPos(x-centerPane.getX(), y-centerPane.getY());
+            
           }
         } else if (getParent().getClass() == TracksDragPane.class) {
           // Center on mouse cursor
-          setX(mouseX-getWidth()/2);
-          setY(mouseY-getHeight()/2);
+          //setX(mouseX-getWidth()/2);
+          //setY(mouseY-getHeight()/2);
+          setX(getX() + mouseX-pmouseX);
+          setY(getY() + mouseY-pmouseY);
         }
       }
       return false;
@@ -579,6 +603,7 @@ class TracksWindow extends Window {
         float endX = getX() + note.getEnd()*getScaleX()/24;
         line(startX, getY()+64-0.5*pitch, endX, getY()+64-0.5*pitch);
       }
+      unsetRenderDirty();
     }
   }
 }
