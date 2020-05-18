@@ -1,7 +1,7 @@
 import java.util.concurrent.Callable;
 
 static final boolean DEBUG = false;
-static final boolean LAZY_RENDERING = true;
+static final boolean LAZY_RENDERING = false;
 
 
 static final int ALIGN_ROW = 1;
@@ -202,7 +202,7 @@ class Window extends Container {
   private Element draggedElement = null;
   private Element selectedElement = null;
   private final UI ui;
-  private float scaleX = 1.0f;
+  private float scaleX = 3.0f;
   private float scaleY = 1.0f;
 
   public Window(UI ui) {
@@ -643,8 +643,9 @@ class Button extends DynamicContainer {
 
   public void action() { }
 
-  public void press() { pressed = true; setRenderDirty(); }
-  public void release() { pressed = false; setRenderDirty(); }
+  public void press() { pressed=true; setRenderDirty(); }
+  public boolean isPressed() { return pressed; }
+  public void release() { pressed=false; setRenderDirty(); }
 
   public boolean mousePressed(MouseEvent event) {
     if (event.getButton() == LEFT) {
@@ -685,7 +686,6 @@ class Button extends DynamicContainer {
  ******************* TOGGLE BUTTON *****************
  ***************************************************/
 class ToggleButton extends Button {
-  protected boolean toggled = false;
 
   public ToggleButton() {
     super();
@@ -694,28 +694,22 @@ class ToggleButton extends Button {
     super(s);
   }
   
-  public void toggle() {
-    toggled =! toggled;
-    if (toggled) press();
-    else release();
-  }
-  public void unToggle() {
-    toggled = false;
-    release();
-  }
-  public boolean isToggled() { return toggled; }
-
-  public boolean mouseClicked(MouseEvent event) {
-    super.mouseClicked(event);
-    toggle();
+  public boolean mousePressed(MouseEvent event) {
     return true;
   }
-  
-  public void render() {
-    if (isToggled()) {
-      pressed = true;
+  public boolean mouseReleased(MouseEvent event) {
+    return true;
+  }
+  public boolean mouseClicked(MouseEvent event) {
+    println("mouseclick"); 
+    //super.mouseClicked(event);
+    if (isPressed()) {
+      release();
+    } else {
+      press();
     }
-    super.render();
+    action();
+    return true;
   }
 }
 
@@ -738,7 +732,7 @@ class ToggleLed extends ToggleButton {
   
   public void render() {
     noStroke();
-    if (isToggled()) {
+    if (isPressed()) {
       fill(radiant);
       ellipse(getX()-2, getY()-2, getWidth()+4, getHeight()+4);
       fill(col);

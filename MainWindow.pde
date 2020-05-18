@@ -1,3 +1,8 @@
+public void loadFile(File inputFile) {
+  tracksWindow.loadFile(inputFile);
+}
+
+
 /***************************************************
  ********************* TOOL BAR ********************
  ***************************************************/
@@ -100,6 +105,7 @@ class TracksWindow extends Window {
   private final TracksToolBar toolBar;
   private final TracksDragPane centerPane;
   private final DynamicContainer tracksContainer;
+  private File fileToLoad = null;
 
   public TracksWindow(UI ui) {
     super(ui);
@@ -132,7 +138,23 @@ class TracksWindow extends Window {
     centerPane.setSizeFixed(width, height-toolBar.getHeight()-bottomBar.getHeight()-2);
   }
   
+  public void loadFile(File inputFile) {
+    fileToLoad = inputFile;    
+  }
+  
   public void render() {
+    if (fileToLoad != null) {
+      ArrayList<MyTrack> tracks = midiManager.loadMidiFile(fileToLoad);
+      clearTracks();
+      for (MyTrack track : tracks) {
+        if (track.getPatterns().isEmpty())
+          break;
+        TrackContainer tc = new TrackContainer(track);
+        addTrack(tc);
+      }
+      fileToLoad = null;
+    }
+    
     renderCount = 0;
     if (centerPane.isRenderDirty()) {
       super.render();
@@ -154,6 +176,9 @@ class TracksWindow extends Window {
     tracksContainer.clear();
     tracksContainer.add(new ButtonAddTrack());
   }
+  //public ArrayList<TrackContainer> getTracks() {
+  //  return tracksContainer.getChildren();
+  //}
   
   public boolean keyPressed(KeyEvent event) {
     // Zoom In/Out
@@ -166,8 +191,9 @@ class TracksWindow extends Window {
       tracksContainer.refresh();
       centerPane.setRenderDirty();
     } else if (event.getKey() == DELETE) {
-      if (getSelected().getClass() == PatternUI.class && getDragged() == null) {
+      if (getSelected()!=null && getSelected().getClass()==PatternUI.class && getDragged()==null) {
         PatternUI pattern = (PatternUI) getSelected();
+        unregisterSelected();
         pattern.getTrackUI().removePattern(pattern);
         println("del");
         centerPane.setRenderDirty();
@@ -280,15 +306,7 @@ class TracksWindow extends Window {
       }
       
       public void action() {
-        File inputFile = new File("/home/gweltaz/Dropbox/Projets/Informatique/MyLiveSeq/FF7prelu.mid");
-        ArrayList<MyTrack> tracks = midiManager.loadMidiFile(inputFile);
-        clearTracks();
-        for (MyTrack track : tracks) {
-          if (track.getPatterns().isEmpty())
-            break;
-          TrackContainer tc = new TrackContainer(track);
-          addTrack(tc);
-        }
+        selectInput("seksec a file", "loadFile");
       }
     }
   }
@@ -297,7 +315,7 @@ class TracksWindow extends Window {
   /***************************************************
    ***************  TRACK CONTAINER  *****************
    ***************************************************/
-  class TrackContainer extends DynamicContainer {
+  public class TrackContainer extends DynamicContainer {
     // Container for a single Track
     private MyTrack track;
     private DynamicContainer msButtons;
@@ -315,15 +333,10 @@ class TracksWindow extends Window {
       msButtons.setPadding(3);
       msButtons.setSpacing(2);
       msButtons.setAlign(ALIGN_COLUMN);
-      float toggleSize = 18;
-      ToggleLed muteToggle = new ToggleLed();
-      muteToggle.setSizeFixed(toggleSize, toggleSize);
-      msButtons.add(muteToggle);
-      muteToggle.setColorFixed(color(244, 0, 0));
-      ToggleLed soloToggle = new ToggleLed();
-      soloToggle.setSizeFixed(toggleSize, toggleSize);
-      msButtons.add(soloToggle);
-      soloToggle.setColorFixed(color(140, 120, 244));
+      float toggleSize = 16;
+      
+      msButtons.add(new MuteToggle());
+      msButtons.add(new SoloToggle());
       TriStateButton loopToggle = new TriStateButton();
       loopToggle.setSizeFixed(toggleSize, toggleSize);
       msButtons.add(loopToggle);
@@ -345,6 +358,51 @@ class TracksWindow extends Window {
       //addButtons.setAlign(ALIGN_VERTICALLY);
     }
     
+    private class MuteToggle extends ToggleLed {
+      public MuteToggle() {
+        super();
+        setSizeFixed(16, 16);
+        setColorFixed(color(244, 0, 0));
+      }
+      public void action() {
+        if (track.isMuted()) {
+          track.unMute();
+        } else {
+          track.mute();
+        }
+      }
+      public void render() {
+        if (track.isMuted()) {
+          press();
+        } else {
+          release();
+        }
+        super.render();
+      }
+    }
+    private class SoloToggle extends ToggleLed {
+      public SoloToggle() {
+        super();
+        setSizeFixed(16, 16);
+        setColorFixed(color(140, 120, 244));
+      }
+      public void action() {
+        if (isPressed()) {
+          midiManager.solo(track);
+        } else {
+          midiManager.solo(null);
+        }
+      }
+      public void render() {
+        if (midiManager.getSolo() == track) {
+          press();
+        } else {
+          release();
+        }
+        super.render();
+      }
+    }    
+    
     private class AddPatButton extends Button {
       public AddPatButton(String s) {
         super(s);
@@ -362,6 +420,7 @@ class TracksWindow extends Window {
     
     public void addPattern(PatternUI patternUI) {
       println("UI: pattern added");
+      println("    length "+patternUI.getPattern().getLength());
       patterns.add(patternUI);
       track.addPattern(patternUI.getPattern());
       align();
@@ -369,6 +428,7 @@ class TracksWindow extends Window {
     }
     public void addPattern(int idx, PatternUI patternUI) {
       println("UI: pattern added");
+      println("    length "+patternUI.getPattern().getLength());
       patterns.add(idx, patternUI);
       track.addPattern(idx, patternUI.getPattern());
       align();
@@ -414,13 +474,11 @@ class TracksWindow extends Window {
     private boolean dropable = false;
     private float spacerIndex;
     private float spacerWidth = 32;
-    //private MyTrack track;
     
     public PatternContainer() {
       super();
       setMinSize(16, 64);
       setAlign(ALIGN_ROW + ALIGN_TOP);
-      //this.track = track;
     }
     
     public float getWidth() {
@@ -492,6 +550,13 @@ class TracksWindow extends Window {
         child.render();
       }
       popMatrix();
+      
+      // Draw tick progress bar
+      noStroke();
+      fill(0, 32);
+      float tx = midiManager.getTick()*getScaleX()/midiManager.getPPQ();
+      rect(getX(), getY(), tx, getHeight());
+      
       unsetRenderDirty();
     }
   }
@@ -508,7 +573,7 @@ class TracksWindow extends Window {
     public PatternUI(Pattern p) {
       super();
       pattern = p;
-      setSize(p.getLength()/24, 64);
+      setSize(p.getLength()/(float) midiManager.getPPQ(), 64);
     }
     
     public Pattern getPattern() { return pattern; }
@@ -533,8 +598,7 @@ class TracksWindow extends Window {
       // Cut pattern in two if CTRL key is down
       if(getTrackUI()!=null && event.isControlDown()) {
         float pointerLocalX = event.getX()-getAbsoluteX();
-        // coordinate unit is 24ticks
-        int tickCoord = round(pointerLocalX*24/getScaleX());
+        int tickCoord = round(pointerLocalX*midiManager.getPPQ()/getScaleX());
         int patternIdx = ((Container) getParent()).getChildren().indexOf(this);
         Pattern[] divided = pattern.divide(tickCoord);
         if (divided[1] != null) {
@@ -579,6 +643,7 @@ class TracksWindow extends Window {
           setX(getX() + mouseX-pmouseX);
           setY(getY() + mouseY-pmouseY);
         }
+        setRenderDirty();
       }
       return false;
     }
@@ -597,10 +662,11 @@ class TracksWindow extends Window {
       
       // Draw notes
       stroke(darker);
+      long ppq = midiManager.getPPQ();
       for (MidiNote note : pattern.getNotes()) {
         int pitch = note.getPitch();
-        float startX = getX() + note.getStart()*getScaleX()/24;
-        float endX = getX() + note.getEnd()*getScaleX()/24;
+        float startX = getX() + note.getStart()*getScaleX()/ppq;
+        float endX = getX() + note.getEnd()*getScaleX()/ppq;
         line(startX, getY()+64-0.5*pitch, endX, getY()+64-0.5*pitch);
       }
       unsetRenderDirty();

@@ -81,9 +81,9 @@ class ConfigWindow extends Window {
       for (Element child : getChildren()) {
         DeviceButton btn = (DeviceButton) child;
         if (btn.getDevice() == selected)
-          btn.toggle();
+          btn.press();
         else
-          btn.unToggle();
+          btn.release();
       }
     }
   }

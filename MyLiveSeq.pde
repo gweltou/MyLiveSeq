@@ -6,7 +6,7 @@ color bgcolor = color(245);
 
 
 void setup() {
-  size(600, 600);
+  size(700, 700);
   //frameRate(1);
   rectMode(CORNER);
   ellipseMode(CORNER);

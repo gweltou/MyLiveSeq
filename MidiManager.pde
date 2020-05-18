@@ -9,6 +9,7 @@ import java.util.PriorityQueue;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.Collections;
 
 
 public class MidiNote {
@@ -39,6 +40,13 @@ public class MidiNote {
   public long getDuration() { 
     return duration;
   }
+
+  public class NoteComparator implements Comparator<MidiNote> {
+    @Override
+      public int compare(MidiNote o1, MidiNote o2) {
+      return Long.compare(o1.getStart(), o2.getStart());
+    }
+  }
 }
 
 
@@ -61,7 +69,7 @@ public class Pattern {
   private long nTicks = 0;
 
   public Pattern() { 
-    this(24*32);
+    this(10000);
   }
   public Pattern(long ticks) {
     setLength(ticks);
@@ -79,11 +87,13 @@ public class Pattern {
     return nTicks;
   }
   public void trimLength() {
+    // Adjust pattern length to last note off
     nTicks = 0;
     for (MidiNote note : midiNotes) {
       if (note.getEnd() > nTicks)
         nTicks = note.getEnd();
     }
+    println("MM: trimlength "+nTicks);
   }
 
   public ArrayList<MidiEvent> getEvents() { 
@@ -91,13 +101,16 @@ public class Pattern {
   }
   public void addEvent(MidiEvent event) { 
     midiEvents.add(event);
+    Collections.sort(midiEvents, midiManager.new EventComparator()); // UGLY
   }
 
   public void addNote(MidiNote note) { 
     midiNotes.add(note);
+    Collections.sort(midiNotes, note.new NoteComparator());  // UGLY, didn't find a way around
   }
-  public void addNotes(ArrayList<MidiNote> notes) { 
+  public void addNotes(ArrayList<MidiNote> notes) {
     midiNotes.addAll(notes);
+    Collections.sort(midiNotes, notes.get(0).new NoteComparator()); // UGLY
   }
   public ArrayList<MidiNote> getNotes() {
     return midiNotes;
@@ -112,7 +125,7 @@ public class Pattern {
         noteOff = new ShortMessage(ShortMessage.NOTE_OFF, channel, note.getPitch(), 0);
         events.add(new MidiEvent(noteOn, offset+note.getStart()));
         events.add(new MidiEvent(noteOff, offset+note.getEnd()));
-      } 
+      }
       catch (InvalidMidiDataException e) {
         e.printStackTrace();
       }
@@ -121,6 +134,7 @@ public class Pattern {
   }
 
   public Pattern[] divide(long ticks) {
+    println("MM: dividing pattern ("+getLength()+") at "+ticks);
     Pattern[] divided = new Pattern[2];
     if (ticks >= getLength() || ticks <= 0) {
       // ticks coordinate out of bounds
@@ -167,7 +181,9 @@ public class MyTrack {
    */
   private int midiChannel;
   private final ArrayList<Pattern> patterns = new ArrayList();
+  private ArrayList<MidiEvent> events = new ArrayList();
   private int patternIdx;
+  private int eventIdx;
   private long tickcount;
   private boolean mute;
   private int playmode;
@@ -178,6 +194,7 @@ public class MyTrack {
   public MyTrack() {
     midiChannel = 0;
     patternIdx = 0;
+    eventIdx = 0;
     mute = false;
     playmode = EOT;
     tickcount = 0;
@@ -186,6 +203,7 @@ public class MyTrack {
   public void addPattern(Pattern pattern) {
     patterns.add(pattern);
     println("MM: Pattern added to track " + this);
+    println("    Pattern length "+pattern.getLength());
   }
   public void addPattern(int idx, Pattern pattern) { 
     patterns.add(idx, pattern);
@@ -202,16 +220,22 @@ public class MyTrack {
   public void setChannel(int chan) {
     // Chan: midi channel from 0 to 15
     midiChannel = chan;
+    println("MM: channel set to " + midiChannel);
   }
   public int getChannel() { 
     return midiChannel;
   }
 
   public void mute() { 
+    println("MM: track muted");
     mute=true;
   }
-  public void unmute() { 
+  public void unMute() {
+    println("MM: track unmuted");
     mute=false;
+  }
+  public boolean isMuted() {
+    return mute;
   }
 
   public void rewind() {
@@ -219,24 +243,38 @@ public class MyTrack {
     tickcount = 0;
   }
 
-  public Pattern tick() {
-    // Return the pattern to be played when timing is right
+  public ArrayList<MidiEvent> tick(long localTick) {
+    // Return the events to be played when timing is right
     // null otherwise
     if (patternIdx < patterns.size()) {
       if (tickcount == 0) {
-        // Return current pattern
-        tickcount++;
-        return patterns.get(patternIdx);
+        // Load current pattern
+        events = patterns.get(patternIdx).asEvents(getChannel(), localTick);
+        Collections.sort(events, midiManager.new EventComparator());
+        eventIdx = 0;
       }
 
       tickcount++;
       if (tickcount >= patterns.get(patternIdx).getLength()) {
         tickcount = 0;
-        if (playmode != LOOP_PATTERN)
+        if (playmode != LOOP_PATTERN) {
           patternIdx++;
+        }
       }
       if (playmode == LOOP_TRACK && patternIdx>=patterns.size()) {
         patternIdx = 0;
+        tickcount = 0;
+      }
+
+      if (!mute) {
+        ArrayList<MidiEvent> toPlay = new ArrayList();
+        while (eventIdx<events.size() && events.get(eventIdx).getTick() <= localTick) {
+          toPlay.add(events.get(eventIdx));
+          eventIdx++;
+        }
+        if (!toPlay.isEmpty())
+          //println(toPlay.size());
+          return toPlay;
       }
     }
     return null;
@@ -263,6 +301,7 @@ public class MidiManager extends Thread {
   private boolean patternPlaying = false;
   private long patternStartTime;
   private long patternLength;
+  private MyTrack soloTrack;
   private long lastTickTime;
   private long localTicks;
   private long lastLocalTickTime;
@@ -432,6 +471,8 @@ public class MidiManager extends Thread {
   public void testNote() {
     try {
       midiOut.send(new ShortMessage(ShortMessage.NOTE_ON, 60, 80), -1);
+      midiOut.send(new ShortMessage(ShortMessage.NOTE_ON, 64, 80), -1);
+      midiOut.send(new ShortMessage(ShortMessage.NOTE_ON, 67, 80), -1);
       try {
         Thread.sleep(200);
       } 
@@ -439,6 +480,8 @@ public class MidiManager extends Thread {
         e.printStackTrace();
       }
       midiOut.send(new ShortMessage(ShortMessage.NOTE_OFF, 60, 0), -1);
+      midiOut.send(new ShortMessage(ShortMessage.NOTE_OFF, 64, 80), -1);
+      midiOut.send(new ShortMessage(ShortMessage.NOTE_OFF, 67, 80), -1);
     } 
     catch (InvalidMidiDataException e) {
       e.printStackTrace();
@@ -484,6 +527,14 @@ public class MidiManager extends Thread {
     println("MM: track added");
   }
 
+  public void solo(MyTrack track) {
+    soloTrack = track;
+    println("Track soloed");
+  }
+  public MyTrack getSolo() { 
+    return soloTrack;
+  }
+
   public void loadPattern(Pattern pattern) {
     this.pattern = pattern;
     patternLength = pattern.getLength() * tickResolution;
@@ -524,6 +575,14 @@ public class MidiManager extends Thread {
     localTickDuration = Math.round(60000/(tickResolution * bpm));
   }
 
+  public long getTick() {
+    return localTicks;
+  }
+
+  public long getPPQ() {
+    return tickResolution;
+  }
+
   public void update() {
     // Read Midi Events from midiIn
     MidiEvent[] newEvents = (midiIn == null) ? null : midiIn.getEvents();
@@ -536,12 +595,12 @@ public class MidiManager extends Thread {
     }
 
     if (isRunning()) {
-      //print('.');
       // Manage clock
       if (!clockSlave) {
         long now = System.currentTimeMillis();
         // Update local ticks (may have a greater resolution that default Midi ticks)
         if (now - lastLocalTickTime >= localTickDuration) {
+          tick();
           localTicks += 1;
           lastLocalTickTime += localTickDuration;
         }
@@ -557,72 +616,6 @@ public class MidiManager extends Thread {
         }
       }
 
-      // Pattern Looping mode
-      if (patternPlaying) {
-        // Loop if end of pattern reached
-        if (localTicks >= patternStartTime+patternLength) {
-          // Turn off remaining active notes if recording
-          if (isRecording()) {
-            for (int i=0; i<128; i++) {
-              if (activeNotesVel[i] > 0) {
-                long noteStartTime = activeNotesTime[i];
-                long start = noteStartTime - patternStartTime;
-                long duration = localTicks - noteStartTime;
-                pattern.addNote(new MidiNote(i, activeNotesVel[i], start, duration));
-                activeNotesVel[i] = 0;
-                try {
-                  ShortMessage message = new ShortMessage(ShortMessage.NOTE_OFF, i, 0);
-                  pattern.addEvent(new MidiEvent(message, patternLength));
-                } 
-                catch (InvalidMidiDataException ignored) {
-                }
-              }
-            }
-          }
-          // Load pattern notes in eventQueue
-          for (MidiEvent midiEvent : pattern.getEvents()) {
-            eventQueue.add(new MidiEvent(midiEvent.getMessage(), midiEvent.getTick()+localTicks));
-          }
-          patternStartTime = localTicks;
-        }
-
-        // Record events to current pattern
-        if (isRecording() && newEvents != null) {
-          for (MidiEvent event : newEvents) {
-            ShortMessage message = (ShortMessage) event.getMessage(); // Maybe clone message
-
-            if (message.getCommand() == ShortMessage.NOTE_ON) {
-              // Register note start time
-              activeNotesTime[message.getData1()] = event.getTick();
-              activeNotesVel[message.getData1()] = message.getData2();
-              pattern.addEvent(new MidiEvent(message, event.getTick()-patternStartTime));
-            } else if (message.getCommand() == ShortMessage.NOTE_OFF) {
-              int pitch = message.getData1();
-              int velocity = activeNotesVel[pitch];
-              if (velocity > 0) {
-                long noteStartTime = activeNotesTime[pitch];
-                long start = noteStartTime - patternStartTime;
-                long duration = localTicks - noteStartTime;
-                pattern.addNote(new MidiNote(pitch, velocity, start, duration));
-                activeNotesVel[pitch] = 0;
-                pattern.addEvent(new MidiEvent(message, event.getTick()-patternStartTime));
-              }
-            }
-            // We could make another condition to include other type of message in the pattern
-          }
-        }
-      }
-
-      // Song mode
-      if (!patternPlaying) {
-        for (MyTrack t : tracks) {
-          Pattern toPlay = t.tick();
-          if (toPlay != null) {
-            eventQueue.addAll(toPlay.asEvents(t.getChannel(), localTicks));
-          }
-        }
-      }
-
       // Send queued Midi events to midiOut
       while (!eventQueue.isEmpty() && eventQueue.peek().getTick() <= localTicks) {
         ShortMessage nextMessage = (ShortMessage) eventQueue.poll().getMessage();
@@ -634,7 +627,24 @@ public class MidiManager extends Thread {
         }
         if (midiOut != null)
           midiOut.send(nextMessage, -1);
-        //print('*');
+      }
+    }
+  }
+
+  private void tick() {
+    // Song mode
+    if (!patternPlaying) {
+      for (MyTrack t : tracks) {
+        ArrayList<MidiEvent> trackEvents = t.tick(localTicks);
+        if (trackEvents == null)
+          continue;
+        if (soloTrack == null) {
+          eventQueue.addAll(trackEvents);
+        } else {
+          if (soloTrack == t) {
+            eventQueue.addAll(trackEvents);
+          }
+        }
       }
     }
   }
@@ -681,13 +691,11 @@ public class MidiManager extends Thread {
   //}
 
 
-  public ArrayList<MidiNote>[] parseEvents(Track track, int ppq) {
+  public MyTrack parseEvents(Track track, int ppq) {
+    int channel = -1;
     float timeScale = (float) tickResolution / ppq;
-    // Separate midi events over 16 channels
-    ArrayList<MidiNote>[] notes = new ArrayList[16];
-    for (int i=0; i<16; i++) {
-      notes[i] = new ArrayList();
-    }
+
+    ArrayList<MidiNote> notes = new ArrayList();
     long[] notesOnTick = new long[128*16];
     Arrays.fill(notesOnTick, -1);
     int[] notesOnVel = new int[128*16];
@@ -699,7 +707,10 @@ public class MidiManager extends Thread {
       if (status == ShortMessage.NOTE_ON || status == ShortMessage.NOTE_OFF) {
         ShortMessage message = (ShortMessage) event.getMessage();
         int command = message.getCommand();
-        int channel = message.getChannel();
+        if (channel == -1) {
+          channel = message.getChannel();
+          println("channel " + channel);
+        }
         if (command == ShortMessage.NOTE_ON) {
           int pitch = message.getData1();
           notesOnTick[channel*128+pitch] = event.getTick();
@@ -709,44 +720,47 @@ public class MidiManager extends Thread {
           long start = Math.round(notesOnTick[channel*128+pitch]*timeScale);
           long duration = Math.round((event.getTick()-notesOnTick[channel*128+pitch])*timeScale);
           int velocity = notesOnVel[channel*128+pitch];
-          notes[channel].add(new MidiNote(pitch, velocity, start, duration));
+          notes.add(new MidiNote(pitch, velocity, start, duration));
         }
       }
     }
-    for (int i=0; i<16; i++) {
-      println(i + " " + notes[i]);
+
+    if (notes.size() > 0) {
+      MyTrack newTrack = new MyTrack();
+      Pattern newPattern = new Pattern();
+      newPattern.addNotes(notes);
+      newPattern.trimLength();
+      println("MM pattern length "+newPattern.getLength());
+      println("MM last note "+newPattern.getNotes().get(newPattern.getNotes().size()-1).getEnd());
+      newTrack.addPattern(newPattern);
+      newTrack.setChannel(channel);
+      return newTrack;
     }
-    return notes;
+    return null;
   }
 
 
   public ArrayList<MyTrack> loadMidiFile(File inputFile) {
     ArrayList<MyTrack> loadedTracks = new ArrayList();
-    for (int i=0; i<16; i++) {
-      loadedTracks.add(new MyTrack());
-    }
 
     try {
       MidiFileFormat format = MidiSystem.getMidiFileFormat(inputFile);
       int ppq = format.getResolution();
+      Sequence seq = MidiSystem.getSequence(inputFile);
       println("File type : " + format.getType());
       println("      ppq : " + format.getResolution());
-      Sequence seq = MidiSystem.getSequence(inputFile);
+      println("      " + seq.getTracks().length + " tracks");
+
+      int i=0;
       for (Track track : seq.getTracks()) {
         // Convert from midi file tracks to this sequencer track format
-        ArrayList<MidiNote>[] arrays = parseEvents(track, ppq);
-        println("track");
-        for (int i=0; i<16; i++) {
-          if (!arrays[i].isEmpty()) {
-            Pattern newPattern = new Pattern();
-            newPattern.addNotes(arrays[i]);
-            newPattern.trimLength();
-            println(newPattern.getLength());
-            loadedTracks.get(i).addPattern(newPattern);
-          }
-        }
+        print("Track " + i++ + " ");
+        MyTrack newTrack = parseEvents(track, ppq);
+        if (newTrack != null)
+          loadedTracks.add(newTrack);
       }
 
+      solo(null);
       tracks.clear();
       tracks.addAll(loadedTracks);
 
