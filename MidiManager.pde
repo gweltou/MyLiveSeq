@@ -703,6 +703,15 @@ public class MidiManager extends Thread {
 
     for (int i=0; i<track.size(); i++) {
       MidiEvent event = track.get(i);
+      if (event.getMessage().getStatus() == 0xFF) {
+        // Meta message
+        MetaMessage meta = (MetaMessage) event.getMessage();
+        if (meta.getType() == 0x51) {
+          println("tempooooooo");
+          println(meta.getData());
+        }
+      }
+
       int status = event.getMessage().getStatus() & 0xF0;
       if (status == ShortMessage.NOTE_ON || status == ShortMessage.NOTE_OFF) {
         ShortMessage message = (ShortMessage) event.getMessage();
@@ -730,8 +739,6 @@ public class MidiManager extends Thread {
       Pattern newPattern = new Pattern();
       newPattern.addNotes(notes);
       newPattern.trimLength();
-      println("MM pattern length "+newPattern.getLength());
-      println("MM last note "+newPattern.getNotes().get(newPattern.getNotes().size()-1).getEnd());
       newTrack.addPattern(newPattern);
       newTrack.setChannel(channel);
       return newTrack;
@@ -749,12 +756,12 @@ public class MidiManager extends Thread {
       Sequence seq = MidiSystem.getSequence(inputFile);
       println("File type : " + format.getType());
       println("      ppq : " + format.getResolution());
+      println("      div : " + format.getDivisionType());
       println("      " + seq.getTracks().length + " tracks");
 
       int i=0;
       for (Track track : seq.getTracks()) {
         // Convert from midi file tracks to this sequencer track format
-        print("Track " + i++ + " ");
         MyTrack newTrack = parseEvents(track, ppq);
         if (newTrack != null)
           loadedTracks.add(newTrack);

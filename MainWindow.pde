@@ -24,7 +24,7 @@ class ToolBar extends DynamicContainer {
     transport.add(stopBtn);
     transport.setAlign(ALIGN_COLUMN + ALIGN_VERTICALLY);
     
-    Controller tempoCtrl = new Controller("BPM");
+    Controller tempoCtrl = new TempoController("BPM");
     tempoCtrl.setBoundaries(20, 400);
     tempoCtrl.setValue(120);
     add(tempoCtrl);
@@ -58,6 +58,14 @@ class ToolBar extends DynamicContainer {
     }
     public void action() {
       midiManager.stopAndRewind();
+    }
+  }
+  class TempoController extends Controller {
+    public TempoController(String s) {
+      super(s);
+    }
+    public void action() {
+      midiManager.setBpm(getValue());
     }
   }
 }

@@ -878,8 +878,11 @@ public class Controller extends DynamicContainer {
     add(valueLabel);
   }
   
+  public void action() {}
+  
   public void setBoundaries(float min, float max) { minValue=min; maxValue=max; }
   
+  public float getValue() { return rawValue; }
   public void setValue(float val) {
     rawValue = constrain(val, minValue, maxValue);
     valueLabel.setValue(String.valueOf(round(rawValue)));
@@ -898,6 +901,7 @@ public class Controller extends DynamicContainer {
       if (event.isControlDown())
         scale = 0.2f;
       setValue(rawValue + scale*0.005*(maxValue-minValue)*(pmouseY-mouseY));
+      action();
       return true;
     }
     return false;
