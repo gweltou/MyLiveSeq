@@ -114,6 +114,7 @@ class TracksWindow extends Window {
   private final TracksDragPane centerPane;
   private final DynamicContainer tracksContainer;
   private File fileToLoad = null;
+  private MyTrack selectedTrack = null;
 
   public TracksWindow(UI ui) {
     super(ui);
@@ -187,6 +188,12 @@ class TracksWindow extends Window {
   //public ArrayList<TrackContainer> getTracks() {
   //  return tracksContainer.getChildren();
   //}
+  public MyTrack getSelectedTrack() { return selectedTrack; }
+  public void selectTrack(MyTrack t) {
+    selectedTrack = t;
+    toolBar.setTrack(t);
+    println("track selected : "+t);
+  }
   
   public boolean keyPressed(KeyEvent event) {
     // Zoom In/Out
@@ -234,21 +241,29 @@ class TracksWindow extends Window {
    ***************** TRACKS TOOL BAR *****************
    ***************************************************/
   class TracksToolBar extends ToolBar {
+    private MyTrack track = null; // Selected track
+    private ChannelController channelCtrl;
+    private OctaveController octaveCtrl;
+    
     public TracksToolBar() {
       super();
       
-      Controller channelCtrl = new Controller("CHAN");
-      channelCtrl.setBoundaries(1, 16);
-      channelCtrl.setValue(1);
       DynamicContainer spacer = new DynamicContainer();
       spacer.setMinSize(5, 0);
       add(spacer);
       
+      channelCtrl = new ChannelController("CHAN");
+      channelCtrl.setBoundaries(1, 16);
+      channelCtrl.setValue(1);
+      channelCtrl.deactivate();
       add(channelCtrl);
-      Controller octaveCtrl = new Controller("OCT");
+      
+      octaveCtrl = new OctaveController("OCT");
       octaveCtrl.setBoundaries(-4, 4);
       octaveCtrl.setValue(0);
+      octaveCtrl.deactivate();
       add(octaveCtrl);
+      
       Controller transposeCtrl = new Controller("TRA");
       transposeCtrl.setBoundaries(-12, 12);
       transposeCtrl.setValue(0);
@@ -265,6 +280,38 @@ class TracksWindow extends Window {
       add(randomRytCtrl);
       
       setSizeFixed(width, getHeight());
+    }
+    
+    public void setTrack(MyTrack t) {
+      track = t;
+      if (t != null) {
+        channelCtrl.setValue(track.getChannel());
+        channelCtrl.activate();
+        octaveCtrl.setValue(track.getOctave());
+        octaveCtrl.activate();
+      } else {
+        channelCtrl.deactivate();
+        octaveCtrl.deactivate();
+      }
+    }
+    
+    private class ChannelController extends Controller {
+      public ChannelController(String s) {
+        super(s);
+      }
+      public void action() {
+        println(round(getValue()));
+        track.setChannel(round(getValue())-1);
+      }
+    }
+    private class OctaveController extends Controller {
+      public OctaveController(String s) {
+        super(s);
+      }
+      public void action() {
+        println(round(getValue()));
+        track.setOctave(round(getValue()));
+      }
     }
   }
   
@@ -449,9 +496,13 @@ class TracksWindow extends Window {
       shrink();
     }
     
-    public void setColor(color c) {
-      super.setColor(colNoise(c, 50));
+    public boolean mouseClicked(MouseEvent event) {
+      boolean accepted = super.mouseClicked(event);
+      selectTrack(track);
+      return accepted;
     }
+    
+    
   }
   
   
@@ -468,6 +519,7 @@ class TracksWindow extends Window {
       boolean accepted = super.mouseClicked(event);
       if (accepted == false) {
         unregisterSelected();
+        selectTrack(null);
       }
       return accepted;
     }
@@ -525,6 +577,10 @@ class TracksWindow extends Window {
         return true;
       }
       return false;
+    }
+    
+    public void setColor(color c) {
+      super.setColor(colNoise(c, 50));
     }
     
     public void render() {

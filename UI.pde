@@ -856,6 +856,7 @@ public class Controller extends DynamicContainer {
   private Label label;
   private Knob knob;
   private Label valueLabel;
+  private boolean active = true;
   private float rawValue;
   private float minValue = 0;
   private float maxValue = 127;
@@ -890,19 +891,23 @@ public class Controller extends DynamicContainer {
     knob.setAngle(-angle);
     setRenderDirty();
   }
+  public void activate() { active=true; }
+  public void deactivate() { active=false; }
   
   public boolean mouseDragged(MouseEvent event) {
-    if (getWindow().getDragged() == null) {
-      getWindow().registerDragged(this);
-      return true;
-    }
-    if (getWindow().getDragged() == this) {
-      float scale = 1.0f;
-      if (event.isControlDown())
-        scale = 0.2f;
-      setValue(rawValue + scale*0.005*(maxValue-minValue)*(pmouseY-mouseY));
-      action();
-      return true;
+    if (active) {
+      if (getWindow().getDragged() == null) {
+        getWindow().registerDragged(this);
+        return true;
+      }
+      if (getWindow().getDragged() == this) {
+        float scale = 1.0f;
+        if (event.isControlDown())
+          scale = 0.2f;
+        setValue(rawValue + scale*0.005*(maxValue-minValue)*(pmouseY-mouseY));
+        action();
+        return true;
+      }
     }
     return false;
   }
@@ -912,5 +917,10 @@ public class Controller extends DynamicContainer {
     noStroke();
     rect(getX(), getY(), getWidth(), getHeight(), 6);
     super.render();
+    if (!active) {
+      fill(127, 120);
+      noStroke();
+      rect(getX(), getY(), getWidth(), getHeight(), 6);
+    }
   }
 }

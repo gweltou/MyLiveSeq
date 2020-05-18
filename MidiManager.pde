@@ -41,6 +41,20 @@ public class MidiNote {
     return duration;
   }
 
+  public ArrayList<MidiEvent> asEvents(int channel, long offset) {
+    ArrayList<MidiEvent> events = new ArrayList(2);
+    try {
+      ShortMessage noteOn = new ShortMessage(ShortMessage.NOTE_ON, channel, getPitch(), getVelocity());
+      ShortMessage noteOff = new ShortMessage(ShortMessage.NOTE_OFF, channel, getPitch(), 0);
+      events.add(new MidiEvent(noteOn, offset));
+      events.add(new MidiEvent(noteOff, offset+getDuration()));
+    } 
+    catch (InvalidMidiDataException e) {
+      e.printStackTrace();
+    }
+    return events;
+  }
+
   public class NoteComparator implements Comparator<MidiNote> {
     @Override
       public int compare(MidiNote o1, MidiNote o2) {
@@ -183,10 +197,12 @@ public class MyTrack {
   private final ArrayList<Pattern> patterns = new ArrayList();
   private ArrayList<MidiEvent> events = new ArrayList();
   private int patternIdx;
+  private int noteIdx;
   private int eventIdx;
   private long tickcount;
   private boolean mute;
   private int playmode;
+  private int octave;
   static public final int EOT = 0;            // Stop at end of track
   static public final int LOOP_TRACK = 1;     // Loop whole track
   static public final int LOOP_PATTERN = 2;   // Loop current pattern
@@ -194,6 +210,7 @@ public class MyTrack {
   public MyTrack() {
     midiChannel = 0;
     patternIdx = 0;
+    noteIdx = 0;
     eventIdx = 0;
     mute = false;
     playmode = EOT;
@@ -238,6 +255,11 @@ public class MyTrack {
     return mute;
   }
 
+  public void setOctave(int o) { 
+    octave = o;
+  }
+  public int getOctave() { return octave; }
+
   public void rewind() {
     patternIdx = 0;
     tickcount = 0;
@@ -247,11 +269,29 @@ public class MyTrack {
     // Return the events to be played when timing is right
     // null otherwise
     if (patternIdx < patterns.size()) {
+      ArrayList<MidiEvent> toPlay = new ArrayList(8);
+
       if (tickcount == 0) {
         // Load current pattern
         events = patterns.get(patternIdx).asEvents(getChannel(), localTick);
         Collections.sort(events, midiManager.new EventComparator());
         eventIdx = 0;
+        noteIdx = 0;
+      }
+
+      if (!mute) {
+        ArrayList<MidiNote> notes = patterns.get(patternIdx).getNotes();
+        MidiNote note;
+        while (noteIdx<notes.size() && notes.get(noteIdx).getStart() <= tickcount) {
+          note = notes.get(noteIdx);
+          if (octave != 0) {
+            // Transpose notes by octaves
+            note = new MidiNote(note.getPitch()+12*octave, note.getVelocity(), note.getStart(), note.getDuration());
+          }
+          ArrayList<MidiEvent> events = note.asEvents(getChannel(), localTick);
+          toPlay.addAll(events);
+          noteIdx++;
+        }
       }
 
       tickcount++;
@@ -266,16 +306,7 @@ public class MyTrack {
         tickcount = 0;
       }
 
-      if (!mute) {
-        ArrayList<MidiEvent> toPlay = new ArrayList();
-        while (eventIdx<events.size() && events.get(eventIdx).getTick() <= localTick) {
-          toPlay.add(events.get(eventIdx));
-          eventIdx++;
-        }
-        if (!toPlay.isEmpty())
-          //println(toPlay.size());
-          return toPlay;
-      }
+      return toPlay;
     }
     return null;
   }
@@ -573,6 +604,7 @@ public class MidiManager extends Thread {
     bpm = newBpm;
     externalTickDuration = Math.round(60000/(24 * bpm));   // 24 ticks per quarter-note
     localTickDuration = Math.round(60000/(tickResolution * bpm));
+    println("MM: BPM set to " + newBpm);
   }
 
   public long getTick() {
@@ -703,6 +735,7 @@ public class MidiManager extends Thread {
 
     for (int i=0; i<track.size(); i++) {
       MidiEvent event = track.get(i);
+      /*
       if (event.getMessage().getStatus() == 0xFF) {
         // Meta message
         MetaMessage meta = (MetaMessage) event.getMessage();
@@ -710,7 +743,7 @@ public class MidiManager extends Thread {
           println("tempooooooo");
           println(meta.getData());
         }
-      }
+      }*/
 
       int status = event.getMessage().getStatus() & 0xF0;
       if (status == ShortMessage.NOTE_ON || status == ShortMessage.NOTE_OFF) {
