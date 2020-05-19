@@ -213,7 +213,7 @@ public class MyTrack {
     noteIdx = 0;
     eventIdx = 0;
     mute = false;
-    playmode = EOT;
+    playmode = LOOP_TRACK;
     tickcount = 0;
   }
 
@@ -480,6 +480,7 @@ public class MidiManager extends Thread {
     if (outputDevice != null) {
       stopAndRewind();
       outputDevice.close();
+      println("MM: closing output device");
     }
     if (output_device == -1)
       return;

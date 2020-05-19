@@ -1,7 +1,7 @@
 import java.util.concurrent.Callable;
 
 static final boolean DEBUG = false;
-static final boolean LAZY_RENDERING = false;
+static final boolean LAZY_RENDERING = true;
 
 
 static final int ALIGN_ROW = 1;
@@ -220,7 +220,7 @@ class Window extends Container {
   public Element getSelected() { return selectedElement; }
   public void unregisterSelected() { selectedElement = null; }
 
-  public void show() { 
+  public void show() {
     ui.setWindow(this);
     super.render();
   }
@@ -643,9 +643,19 @@ class Button extends DynamicContainer {
 
   public void action() { }
 
-  public void press() { pressed=true; setRenderDirty(); }
   public boolean isPressed() { return pressed; }
-  public void release() { pressed=false; setRenderDirty(); }
+  public void press() {
+    if (!isPressed()) {
+      pressed=true;
+      setRenderDirty();
+    }
+  }
+  public void release() {
+    if (isPressed()) {
+      pressed=false;
+      setRenderDirty();
+    }
+  }
 
   public boolean mousePressed(MouseEvent event) {
     if (event.getButton() == LEFT) {

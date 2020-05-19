@@ -152,6 +152,7 @@ class TracksWindow extends Window {
   }
   
   public void render() {
+    // Load a new midi file from fileSelector
     if (fileToLoad != null) {
       ArrayList<MyTrack> tracks = midiManager.loadMidiFile(fileToLoad);
       clearTracks();
@@ -174,8 +175,8 @@ class TracksWindow extends Window {
     //if (getDragged() != null && getDragged().getClass()==PatternUI.class) {
     //  getDragged().render();
     //}
-    //if (renderCount > 0)
-      //println("renderCount: " + renderCount);
+    if (renderCount > 0)
+      println("renderCount: " + renderCount);
   }
   
   public void addTrack(TrackContainer trackContainer) {
@@ -285,7 +286,7 @@ class TracksWindow extends Window {
     public void setTrack(MyTrack t) {
       track = t;
       if (t != null) {
-        channelCtrl.setValue(track.getChannel());
+        channelCtrl.setValue(track.getChannel()+1);
         channelCtrl.activate();
         octaveCtrl.setValue(track.getOctave());
         octaveCtrl.activate();
@@ -448,15 +449,15 @@ class TracksWindow extends Window {
           midiManager.solo(null);
         }
       }
-      public void render() {
+      public void render() {/*
         if (midiManager.getSolo() == track) {
           press();
         } else {
           release();
-        }
+        }*/
         super.render();
       }
-    }    
+    }
     
     private class AddPatButton extends Button {
       public AddPatButton(String s) {
@@ -671,7 +672,7 @@ class TracksWindow extends Window {
           getTrackUI().removePattern(this);
         }
       }
-      setRenderDirty();
+      //setRenderDirty();
       return true;
     }
     public boolean mouseDragged(MouseEvent event) {
