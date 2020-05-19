@@ -201,6 +201,7 @@ class Element {
 class Window extends Container {
   private Element draggedElement = null;
   private Element selectedElement = null;
+  private Element resizedElement = null;
   private final UI ui;
   private float scaleX = 3.0f;
   private float scaleY = 1.0f;
@@ -219,6 +220,9 @@ class Window extends Container {
   public void registerSelected(Element element) { selectedElement = element; }
   public Element getSelected() { return selectedElement; }
   public void unregisterSelected() { selectedElement = null; }
+  public Element getResized() { return resizedElement; }
+  public void registerResized(Element element) { resizedElement = element; }
+  public void unregisterResized() { resizedElement = null; }
 
   public void show() {
     ui.setWindow(this);
@@ -226,14 +230,19 @@ class Window extends Container {
   }
 
   public boolean mouseReleased(MouseEvent event) {
-    boolean accepted = super.mouseReleased(event);
+    boolean accepted = false;
+    if (draggedElement != null) {
+      // Send event to dragged element directly (useful for knobs and resizing patterns)
+      accepted = draggedElement.mouseReleased(event);
+    }
+    accepted = super.mouseReleased(event);
     draggedElement = null;
     return accepted;
   }
   public boolean mouseDragged(MouseEvent event) {
     boolean accepted = false;
     if (draggedElement != null) {
-      // Send event to dragged element directly (useful for knobs)
+      // Send event to dragged element directly (useful for knobs and resizing patterns)
       accepted = draggedElement.mouseDragged(event);
     }
     return accepted ? accepted : super.mouseDragged(event);

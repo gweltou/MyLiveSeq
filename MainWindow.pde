@@ -217,6 +217,24 @@ class TracksWindow extends Window {
     }
     return false;
   }
+  public boolean mouseDragged(MouseEvent event) {
+    boolean accepted = false;
+    if (getResized() != null) {
+      // Send event to dragged element directly (useful for knobs and resizing patterns)
+      accepted = getResized().mouseDragged(event);
+    }
+    return accepted ? accepted : super.mouseDragged(event);
+  }
+  public boolean mouseReleased(MouseEvent event) {
+    if (getResized() != null) {
+      getResized().mouseReleased(event);
+      unregisterResized();
+      println("unregister resized");
+      return true;
+    }
+    boolean accepted = super.mouseReleased(event);
+    return accepted;
+  }
   
   
   /***************************************************
@@ -362,7 +380,7 @@ class TracksWindow extends Window {
       }
       
       public void action() {
-        selectInput("seksec a file", "loadFile");
+        selectInput("Load a MIDI file", "loadFile");
       }
     }
   }
@@ -521,6 +539,7 @@ class TracksWindow extends Window {
       if (accepted == false) {
         unregisterSelected();
         selectTrack(null);
+        setRenderDirty();
       }
       return accepted;
     }
@@ -554,7 +573,8 @@ class TracksWindow extends Window {
       return super.mouseDragged(event);
     }
     public boolean mouseReleased(MouseEvent event) {
-      // Check if a dragged Pattern is above
+      println("mouseReleased of patterns container");
+      //boolean accepted = super.mouseReleased(event);
       Element dragged = getDragged();
       if (dragged != null && dragged.getClass() == PatternUI.class) {
         // Capture Pattern
@@ -634,6 +654,7 @@ class TracksWindow extends Window {
   class PatternUI extends Element {
     // PatternUI should not be confused with Pattern class
     private final Pattern pattern;
+    //private boolean resizing = false;
 
     public PatternUI(Pattern p) {
       super();
@@ -653,7 +674,6 @@ class TracksWindow extends Window {
     public void setColor(color c) {
       super.setColor(colMult(colNoise(colSat(c, 1.2), 14), 1.33));
     }
-    
     public float getWidth() { return super.getWidth() * getScaleX(); }
     public float getHeight() { return super.getHeight() * getScaleY(); }
     
@@ -675,15 +695,34 @@ class TracksWindow extends Window {
       //setRenderDirty();
       return true;
     }
+    public boolean mousePressed(MouseEvent event) {
+      if (getResized() == null) {      
+          // Resizing
+          println("resizing");
+          if (event.getX() > getAbsoluteX()+getWidth()-6)
+            registerResized(this);
+          return true;
+      }
+      return false;
+    }
     public boolean mouseDragged(MouseEvent event) {
+      if (getResized() == this) {
+        // Resizing pattern
+        println("resizing");
+        int newSize = round( (mouseX-getAbsoluteX())/getScaleX() );
+        setSize(newSize, 64);
+        setRenderDirty(); //XXX
+        return true;
+      }
+      
       // Drag only if no other element is being dragged
       if (getDragged() == null) {
         registerDragged(this);
-        return true;
       }
-
       if (getDragged() == this) {
+        // Mouving pattern around
         if (getParent().getClass() == PatternContainer.class) {
+          // Pattern is in a track
           if (event.isShiftDown()) {
             // Copy this pattern
             PatternUI copy = new PatternUI(new Pattern(pattern));
@@ -699,14 +738,11 @@ class TracksWindow extends Window {
             // Add pattern to centerPane
             centerPane.add(this);
             setPos(x-centerPane.getX(), y-centerPane.getY());
-            
           }
         } else if (getParent().getClass() == TracksDragPane.class) {
           // Center on mouse cursor
-          //setX(mouseX-getWidth()/2);
-          //setY(mouseY-getHeight()/2);
-          setX(getX() + mouseX-pmouseX);
-          setY(getY() + mouseY-pmouseY);
+          setX(mouseX-centerPane.getX()-getWidth()/2);
+          setY(mouseY-centerPane.getY()-getHeight()/2);
         }
         setRenderDirty();
       }
@@ -734,6 +770,11 @@ class TracksWindow extends Window {
         float endX = getX() + note.getEnd()*getScaleX()/ppq;
         line(startX, getY()+64-0.5*pitch, endX, getY()+64-0.5*pitch);
       }
+      
+      // Draw handle
+      fill(255, 100);
+      noStroke();
+      rect(getX()+getWidth()-6, 0, getX()+getWidth(), 64);
       unsetRenderDirty();
     }
   }
