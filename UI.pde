@@ -214,16 +214,16 @@ class Window extends Container {
   public float getScaleY() { return scaleY; }
   public void setScaleX(float x) { scaleX = x; }
   public void setScaleY(float y) { scaleY = y; }
-  public void registerDragged(Element element) { draggedElement = element; }
+  public void registerDragged(Element element) { draggedElement=element; }
   public Element getDragged() { return draggedElement; }
   public void unregisterDragged() { draggedElement = null; }
-  public void registerSelected(Element element) { selectedElement = element; }
+  public void registerSelected(Element element) { selectedElement=element; }
   public Element getSelected() { return selectedElement; }
   public void unregisterSelected() { selectedElement = null; }
   public Element getResized() { return resizedElement; }
   public void registerResized(Element element) { resizedElement = element; }
   public void unregisterResized() { resizedElement = null; }
-
+  
   public void show() {
     ui.setWindow(this);
     super.render();

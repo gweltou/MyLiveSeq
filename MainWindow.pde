@@ -151,6 +151,11 @@ class TracksWindow extends Window {
     fileToLoad = inputFile;    
   }
   
+  public void registerSelected(Element element) {
+    super.registerSelected(element);
+    centerPane.setRenderDirty();
+  }
+  
   public void render() {
     // Load a new midi file from fileSelector
     if (fileToLoad != null) {
@@ -191,9 +196,11 @@ class TracksWindow extends Window {
   //}
   public MyTrack getSelectedTrack() { return selectedTrack; }
   public void selectTrack(MyTrack t) {
+    // Link the toolbar controllers to the currently selected track
     selectedTrack = t;
     toolBar.setTrack(t);
     println("track selected : "+t);
+    //setRenderDirty();
   }
   
   public boolean keyPressed(KeyEvent event) {
@@ -249,6 +256,7 @@ class TracksWindow extends Window {
       track.addPattern(new Pattern());
       midiManager.addTrack(track);
       TrackContainer tc = new TrackContainer(track);
+      // Add before "Add" button
       tracksContainer.add(tracksContainer.getChildren().size()-1, tc);
       
       getWindow().registerSelected(tc.getChildren().get(0));
@@ -514,6 +522,7 @@ class TracksWindow extends Window {
       align();
       shrink();
     }
+    public MyTrack getTrack() { return track; }
     
     public boolean mouseClicked(MouseEvent event) {
       boolean accepted = super.mouseClicked(event);
@@ -710,8 +719,18 @@ class TracksWindow extends Window {
         // Resizing pattern
         println("resizing");
         int newSize = round( (mouseX-getAbsoluteX())/getScaleX() );
-        setSize(newSize, 64);
-        setRenderDirty(); //XXX
+        if (event.isShiftDown()) {
+          // Stretch notes
+          println("streeeetch");
+        } else {
+          setSize(newSize, 64);
+          if (getTrackUI() != null) {
+            ((PatternContainer) getParent()).align();
+            getTrackUI().align();
+            //getTrackUI().shrink();
+          }
+        }
+        setRenderDirty();
         return true;
       }
       
@@ -753,7 +772,9 @@ class TracksWindow extends Window {
       stroke(dark);
       strokeWeight(1);
       fill(col);
-      if (getSelected()==this || getSelected()==getParent()) {
+      if (getTrackUI()!=null && getSelectedTrack()==getTrackUI().getTrack()) {
+        fill(light);
+      } else if (getSelected()==this || getSelected()==getParent()) {
         // Selected
         fill(light);
       } else if (getDragged()==this) {
@@ -771,10 +792,11 @@ class TracksWindow extends Window {
         line(startX, getY()+64-0.5*pitch, endX, getY()+64-0.5*pitch);
       }
       
-      // Draw handle
-      fill(255, 100);
+      // Draw resize handle
+      fill(255, 80);
       noStroke();
-      rect(getX()+getWidth()-6, 0, getX()+getWidth(), 64);
+      rect(getX()+getWidth()-6, getY(), 6, 64);
+      
       unsetRenderDirty();
     }
   }
