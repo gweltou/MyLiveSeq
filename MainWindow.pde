@@ -180,7 +180,7 @@ class TracksWindow extends Window {
     //if (getDragged() != null && getDragged().getClass()==PatternUI.class) {
     //  getDragged().render();
     //}
-    if (renderCount > 0)
+    if (DEBUG && renderCount > 0)
       println("renderCount: " + renderCount);
   }
   
@@ -233,6 +233,7 @@ class TracksWindow extends Window {
     return accepted ? accepted : super.mouseDragged(event);
   }
   public boolean mouseReleased(MouseEvent event) {
+    // Send signal to pattern that is being resized
     if (getResized() != null) {
       getResized().mouseReleased(event);
       unregisterResized();
@@ -429,7 +430,9 @@ class TracksWindow extends Window {
       add(patterns);
       // Add existing patterns in track
       for (Pattern p : track.getPatterns()) {
-        patterns.add(new PatternUI(p));
+        PatternUI pui = new PatternUI(p);
+        patterns.add(pui);
+        pui.setColorFixed(colMult(colNoise(colSat(pui.col, 1.2), 14), 1.33));
       }
       
       // Add New Pattern Buttons
@@ -491,12 +494,11 @@ class TracksWindow extends Window {
         setTextSize(16);
       }
       public void action() {
-        println("action");
         Pattern newPattern = new Pattern();
         track.addPattern(newPattern);
         PatternUI patUI = new PatternUI(newPattern);
         addPattern(patUI);
-        patUI.setColorFixed();
+        patUI.setColorFixed(colMult(colNoise(colSat(patUI.col, 1.2), 14), 1.33));
       }
     }
     
@@ -663,7 +665,6 @@ class TracksWindow extends Window {
   class PatternUI extends Element {
     // PatternUI should not be confused with Pattern class
     private final Pattern pattern;
-    //private boolean resizing = false;
 
     public PatternUI(Pattern p) {
       super();
@@ -680,9 +681,6 @@ class TracksWindow extends Window {
       return null;
     }
     
-    public void setColor(color c) {
-      super.setColor(colMult(colNoise(colSat(c, 1.2), 14), 1.33));
-    }
     public float getWidth() { return super.getWidth() * getScaleX(); }
     public float getHeight() { return super.getHeight() * getScaleY(); }
     
@@ -696,8 +694,12 @@ class TracksWindow extends Window {
         int patternIdx = ((Container) getParent()).getChildren().indexOf(this);
         Pattern[] divided = pattern.divide(tickCoord);
         if (divided[1] != null) {
-          getTrackUI().addPattern(patternIdx, new PatternUI(divided[0]));
-          getTrackUI().addPattern(patternIdx+1, new PatternUI(divided[1]));
+          PatternUI left = new PatternUI(divided[0]);
+          PatternUI right = new PatternUI(divided[1]);
+          left.setColorFixed(colNoise(col, 14));
+          right.setColorFixed(colNoise(col, 14));
+          getTrackUI().addPattern(patternIdx, left);
+          getTrackUI().addPattern(patternIdx+1, right);
           getTrackUI().removePattern(this);
         }
       }
@@ -707,28 +709,40 @@ class TracksWindow extends Window {
     public boolean mousePressed(MouseEvent event) {
       if (getResized() == null) {      
           // Resizing
-          println("resizing");
           if (event.getX() > getAbsoluteX()+getWidth()-6)
             registerResized(this);
           return true;
       }
       return false;
     }
+    public boolean mouseReleased(MouseEvent event) {
+      println("UI: Pattern mouseReleased");
+      if (getResized() == this) {
+        if (event.isShiftDown()) {
+          // Stretch notes
+          println("UI Pattern: stretch");
+          getPattern().stretchTo(midiManager.getPPQ()*round(super.getWidth()));
+        } else {
+          println("UI PatternUI: size set to "+midiManager.getPPQ()*round(super.getWidth()));
+          getPattern().setLength(midiManager.getPPQ()*round(super.getWidth()));
+        }
+      }
+      return false;
+    }
     public boolean mouseDragged(MouseEvent event) {
       if (getResized() == this) {
         // Resizing pattern
-        println("resizing");
-        int newSize = round( (mouseX-getAbsoluteX())/getScaleX() );
+        float newSize = (mouseX-getAbsoluteX())/getScaleX();
+        println("resizing to "+newSize);
         if (event.isShiftDown()) {
           // Stretch notes
           println("streeeetch");
-        } else {
-          setSize(newSize, 64);
-          if (getTrackUI() != null) {
-            ((PatternContainer) getParent()).align();
-            getTrackUI().align();
-            //getTrackUI().shrink();
-          }
+        }
+        setSize(newSize, 64);
+        if (getTrackUI() != null) {
+          ((PatternContainer) getParent()).align();
+          getTrackUI().align();
+          //getTrackUI().shrink();
         }
         setRenderDirty();
         return true;
@@ -743,8 +757,9 @@ class TracksWindow extends Window {
         if (getParent().getClass() == PatternContainer.class) {
           // Pattern is in a track
           if (event.isShiftDown()) {
-            // Copy this pattern
+            // Copy this pattern (SHIFT key)
             PatternUI copy = new PatternUI(new Pattern(pattern));
+            copy.setColorFixed(col);
             registerDragged(copy);
             copy.setX(getAbsoluteX());
             copy.setY(getAbsoluteY());
@@ -789,6 +804,9 @@ class TracksWindow extends Window {
         int pitch = note.getPitch();
         float startX = getX() + note.getStart()*getScaleX()/ppq;
         float endX = getX() + note.getEnd()*getScaleX()/ppq;
+        // Crop notes that are after end of pattern
+        if (endX > getWidth())
+          break;
         line(startX, getY()+64-0.5*pitch, endX, getY()+64-0.5*pitch);
       }
       

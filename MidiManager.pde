@@ -83,7 +83,7 @@ public class Pattern {
   private long nTicks = 0;
 
   public Pattern() { 
-    this(10000);
+    this(32*midiManager.getPPQ());
   }
   public Pattern(long ticks) {
     setLength(ticks);
@@ -96,6 +96,7 @@ public class Pattern {
 
   public void setLength(long ticks) { 
     this.nTicks = ticks;
+    println("MM: pattern set length to "+ticks);
   }
   public long getLength() {
     return nTicks;
@@ -108,6 +109,29 @@ public class Pattern {
         nTicks = note.getEnd();
     }
     println("MM: trimlength "+nTicks);
+  }
+
+  public void stretchTo(long ticks) {
+    println("MM Pattern: stretchto "+ticks);
+    float ratio = ticks / getLength();
+    setLength(ticks);
+    ArrayList<MidiNote> stretchedNotes = new ArrayList();
+    ArrayList<MidiEvent> stretchedEvents = new ArrayList();
+    for (MidiNote note : getNotes()) {
+      long start = Math.round(note.getStart()*ratio);
+      long duration = Math.round(note.getDuration()*ratio);
+      MidiNote stretchedNote = new MidiNote(note.getPitch(), note.getVelocity(), start, duration);
+      stretchedNotes.add(stretchedNote);
+    }
+    for (MidiEvent event : getEvents()) {
+      long tick = Math.round(event.getTick()*ratio);
+      MidiEvent stretchedEvent = new MidiEvent(event.getMessage(), tick);
+      stretchedEvents.add(stretchedEvent);
+    }
+    midiEvents.clear();
+    midiEvents.addAll(stretchedEvents);
+    midiNotes.clear();
+    midiNotes.addAll(stretchedNotes);
   }
 
   public ArrayList<MidiEvent> getEvents() { 
@@ -258,7 +282,9 @@ public class MyTrack {
   public void setOctave(int o) { 
     octave = o;
   }
-  public int getOctave() { return octave; }
+  public int getOctave() { 
+    return octave;
+  }
 
   public void rewind() {
     patternIdx = 0;
@@ -738,13 +764,13 @@ public class MidiManager extends Thread {
       MidiEvent event = track.get(i);
       /*
       if (event.getMessage().getStatus() == 0xFF) {
-        // Meta message
-        MetaMessage meta = (MetaMessage) event.getMessage();
-        if (meta.getType() == 0x51) {
-          println("tempooooooo");
-          println(meta.getData());
-        }
-      }*/
+       // Meta message
+       MetaMessage meta = (MetaMessage) event.getMessage();
+       if (meta.getType() == 0x51) {
+       println("tempooooooo");
+       println(meta.getData());
+       }
+       }*/
 
       int status = event.getMessage().getStatus() & 0xF0;
       if (status == ShortMessage.NOTE_ON || status == ShortMessage.NOTE_OFF) {
