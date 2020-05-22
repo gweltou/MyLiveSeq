@@ -585,9 +585,10 @@ public class MidiManager extends Thread {
     println("MM: track added");
   }
 
-  public void solo(MyTrack track) {
-    soloTrack = track;
-    println("Track soloed");
+  public void solo(MyTrack t) {
+    soloTrack = t;
+    if (t != null && t.isMuted())
+      t.unMute();
   }
   public MyTrack getSolo() { 
     return soloTrack;

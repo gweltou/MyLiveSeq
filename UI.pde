@@ -224,7 +224,7 @@ class Window extends Container {
   public void show() {
     ui.setWindow(this);
     background(0,255,0);
-    render();
+    //render();
   }
 
   public boolean mouseReleased(MouseEvent event) {
@@ -563,7 +563,7 @@ class DragPane extends Container {
     if (event.getButton() == RIGHT) {
        float dx = mouseX - pmouseX;
        float dy = mouseY - pmouseY;
-       translate(8*dx*getWindow().getScaleX()/midiManager.getPPQ(), 8*dy*getWindow().getScaleY()/midiManager.getPPQ());
+       translate(dx, dy);
        return false;
     }
     return super.mouseDragged(event);

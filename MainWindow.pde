@@ -65,6 +65,7 @@ class TracksWindow extends Window {
         TrackContainer tc = new TrackContainer(track);
         addTrack(tc);
       }
+      surface.setTitle("MyLiveSeq - "+fileToLoad);
       fileToLoad = null;
     }
     
