@@ -1,9 +1,13 @@
 
+
 /***************************************************
  ***************** PATTERN WINDOW ******************
  ***************************************************/
 class PatternWindow extends Window {
   private final PatternToolBar toolBar;
+  private final PatternDragPane centerPane;
+  private Pattern pattern;
+  
   //private final TracksDragPane centerPane;
   
   //centerPane = new TracksDragPane();
@@ -12,14 +16,78 @@ class PatternWindow extends Window {
   
   public PatternWindow(UI ui) {
     super(ui);
+    setWindow(this);
+    setScaleY(5);
+    setColor(color(127));
+    
+    centerPane = new PatternDragPane();
+    centerPane.setSize(width, height);
+    add(centerPane);
     
     toolBar = new PatternToolBar();
     add(toolBar);
 
     BottomBar bottomBar = new PatternBottomBar();
     add(bottomBar);
+    
+    centerPane.setY(toolBar.getHeight()+1.6);
+    centerPane.setSizeFixed(width, height-toolBar.getHeight()-bottomBar.getHeight()-2);
+    centerPane.setRenderDirty(); //XXX
   }
   
+  public void setPattern(Pattern pattern) {
+    this.pattern = pattern;
+    centerPane.clear();
+    for (MidiNote midiNote : pattern.getNotes()) {
+      centerPane.add(new NoteUI(midiNote));
+    }
+  }
+  
+  public void render() {
+    if (centerPane.isRenderDirty()) {
+      super.render();
+    } else {
+      super.renderDirty();
+    }
+  }
+  
+  public boolean keyPressed(KeyEvent event) {
+    // Zoom In/Out
+    if (event.getKey() == 'a') {
+      setScaleX(getScaleX()/2);
+      //centerPane.translate(-centerPane.getTranslateX()*getScaleX(), 0);
+      //tracksContainer.refresh();
+      centerPane.setRenderDirty();
+    } else if (event.getKey() == 'z') {
+      setScaleX(getScaleX()*2);
+      //centerPane.translate(centerPane.getTranslateX()*getScaleX(), 0);
+      //tracksContainer.refresh();
+      centerPane.setRenderDirty();
+    }
+    return false;
+  }
+  
+  private class PatternDragPane extends DragPane {
+    public PatternDragPane() { super(); }
+  }
+  
+  private class NoteUI extends Element {
+    public NoteUI(MidiNote note) {
+      super();
+      setX(note.getStart()/midiManager.getPPQ());
+      setY(128-note.getPitch());
+      setSize(note.getDuration()/midiManager.getPPQ(), 1);
+    }
+    
+    public void render() {
+      println("PatternWindow centerpane: render");
+      strokeWeight(4);
+      stroke(0, 120);
+      line(getX()*getScaleX(), getY()*getScaleY(), getScaleX()*(getX()+getWidth()), getY()*getScaleY());
+    }
+  }
+  
+
   /***************************************************
    ********************* TOOL BAR ********************
    ***************************************************/
@@ -27,10 +95,10 @@ class PatternWindow extends Window {
     
     public PatternToolBar() {
       super();
-      setSize(width, getHeight());
+      setSizeFixed(width, getHeight());
     }
     
-    private class offsetButton extends Button {
+    private class OffsetButton extends Button {
       
     }
     

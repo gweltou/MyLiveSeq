@@ -3,108 +3,6 @@ public void loadFile(File inputFile) {
 }
 
 
-/***************************************************
- ********************* TOOL BAR ********************
- ***************************************************/
-class ToolBar extends DynamicContainer {
-  public ToolBar() {
-    super();
-    setAlign(ALIGN_ROW);
-    //setColor(color(180));
-    setSpacing(4);
-    setPadding(3);
-    
-    DynamicContainer transport = new DynamicContainer();
-    transport.setSpacing(3);
-    transport.setPadding(2);
-    add(transport);
-    Button playBtn = new PlayButton("PLAY");
-    transport.add(playBtn);
-    Button stopBtn = new StopButton("STOP");
-    transport.add(stopBtn);
-    transport.setAlign(ALIGN_COLUMN + ALIGN_VERTICALLY);
-    
-    Controller tempoCtrl = new TempoController("BPM");
-    tempoCtrl.setBoundaries(20, 400);
-    tempoCtrl.setValue(120);
-    add(tempoCtrl);
-  }
-  
-  public void setColor(color c) {
-    super.setColor(colMult(c, 1.4));
-  }
-  
-  public void render() {
-    noStroke();
-    fill(col);
-    rect(getX(), getY(), getWidth(), getHeight());
-    super.render();
-    stroke(dark);
-    strokeWeight(1.6);
-    line(getX(), getHeight(), getWidth(), getHeight());
-  }
-  
-  class PlayButton extends Button {
-    public PlayButton(String s) {
-      super(s);
-    }
-    public void action() {
-      midiManager.play();
-    }
-  }
-  class StopButton extends Button {
-    public StopButton(String s) {
-      super(s);
-    }
-    public void action() {
-      midiManager.stopAndRewind();
-    }
-  }
-  class TempoController extends Controller {
-    public TempoController(String s) {
-      super(s);
-    }
-    public void action() {
-      midiManager.setBpm(getValue());
-    }
-  }
-}
-
-
-
-/***************************************************
- ******************* BOTTOM BAR ********************
- ***************************************************/
-class BottomBar extends Container {
-  public DynamicContainer center = new DynamicContainer();
-
-  public BottomBar() {
-    super();
-    setPadding(3);
-    setAlign(ALIGN_VERTICALLY);
-    center.setSpacing(3);
-    center.setAlign(ALIGN_ROW);
-    add(center);
-  }
-  
-  public void setColor(color c) {
-    super.setColor(colMult(c, 1.4));
-  }
-  
-  public void render() {
-    fill(col);
-    noStroke();
-    rect(getX(), getY(), getWidth(), getHeight());
-    
-    stroke(dark);
-    float weight = 1.6;
-    strokeWeight(weight);
-    line(getX(), getY(), getX()+width, getY());
-    super.render();
-  }
-}
-
-
 int renderCount;
 /***************************************************
  ***************** TRACKS WINDOW *******************
@@ -148,7 +46,7 @@ class TracksWindow extends Window {
   }
   
   public void loadFile(File inputFile) {
-    fileToLoad = inputFile;    
+    fileToLoad = inputFile;
   }
   
   public void registerSelected(Element element) {
@@ -207,10 +105,12 @@ class TracksWindow extends Window {
     // Zoom In/Out
     if (event.getKey() == 'a') {
       setScaleX(getScaleX()/2);
+      //centerPane.translate(-centerPane.getTranslateX()*getScaleX(), 0);
       tracksContainer.refresh();
       centerPane.setRenderDirty();
     } else if (event.getKey() == 'z') {
       setScaleX(getScaleX()*2);
+      //centerPane.translate(centerPane.getTranslateX()*getScaleX(), 0);
       tracksContainer.refresh();
       centerPane.setRenderDirty();
     } else if (event.getKey() == DELETE) {
@@ -379,7 +279,19 @@ class TracksWindow extends Window {
         setTextSize(16);
       }
       public void action() {
-        new PatternWindow(ui).show();
+        if (getSelected() != null && getSelected().getClass() == PatternUI.class) {
+          PatternWindow patternWindow = new PatternWindow(ui);
+          patternWindow.setPattern( ((PatternUI) getSelected()).getPattern() );
+          patternWindow.show();
+        }
+      }
+      void render() {
+        if (getSelected( ) != null && getSelected().getClass() == PatternUI.class) {
+          activate();
+        } else {
+          deactivate();
+        }
+        super.render();
       }
     }
     private class LoadButton extends Button {
@@ -478,12 +390,12 @@ class TracksWindow extends Window {
           midiManager.solo(null);
         }
       }
-      public void render() {/*
+      public void render() {
         if (midiManager.getSolo() == track) {
           press();
         } else {
           release();
-        }*/
+        }
         super.render();
       }
     }
@@ -531,8 +443,6 @@ class TracksWindow extends Window {
       selectTrack(track);
       return accepted;
     }
-    
-    
   }
   
   
@@ -548,6 +458,7 @@ class TracksWindow extends Window {
     public boolean mouseClicked(MouseEvent event) {
       boolean accepted = super.mouseClicked(event);
       if (accepted == false) {
+        println("drag pane unselect");
         unregisterSelected();
         selectTrack(null);
         setRenderDirty();
@@ -686,6 +597,7 @@ class TracksWindow extends Window {
     
     public boolean mouseClicked(MouseEvent event) {
       registerSelected(this);
+      println("UI: Pattern selected");
       
       // Cut pattern in two if CTRL key is down
       if(getTrackUI()!=null && event.isControlDown()) {
@@ -789,9 +701,10 @@ class TracksWindow extends Window {
       fill(col);
       if (getTrackUI()!=null && getSelectedTrack()==getTrackUI().getTrack()) {
         fill(light);
-      } else if (getSelected()==this || getSelected()==getParent()) {
+      }
+      if (getSelected()==this) {
         // Selected
-        fill(light);
+        fill(lighter);
       } else if (getDragged()==this) {
         fill(lighter);
       }

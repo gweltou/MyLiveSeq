@@ -71,12 +71,8 @@ static class UI {
   public void keyPressed(KeyEvent event) { root.keyPressed(event); }
   public void mousePressed(MouseEvent event) { root.mousePressed(event); }
   public void mouseReleased(MouseEvent event) { root.mouseReleased(event); }
-  public void mouseClicked(MouseEvent event) { 
-    root.mouseClicked(event);
-  }
-  public void mouseDragged(MouseEvent event) { 
-    root.mouseDragged(event);
-  }
+  public void mouseClicked(MouseEvent event) { root.mouseClicked(event); }
+  public void mouseDragged(MouseEvent event) { root.mouseDragged(event); }
 }
 
 
@@ -207,6 +203,7 @@ class Window extends Container {
   private float scaleY = 1.0f;
 
   public Window(UI ui) {
+    super();
     this.ui = ui;
   }
   
@@ -226,7 +223,8 @@ class Window extends Container {
   
   public void show() {
     ui.setWindow(this);
-    super.render();
+    background(0,255,0);
+    render();
   }
 
   public boolean mouseReleased(MouseEvent event) {
@@ -541,21 +539,32 @@ class DynamicContainer extends Container {
  ******************* DRAG PANE *********************
  ***************************************************/
 class DragPane extends Container {
+  private float dX = 0;
+  private float dY = 0;
   public DragPane() {
     super();
+  }
+  
+  public float getTranslateX() { return dX; }
+  public float getTranslateY() { return dY; }
+
+  public void translate(float dx, float dy) {
+    dX += dx;
+    dY += dy;
+    for (Element child : getChildren()) {
+      child.setX(child.getX() + dx);
+      child.setY(child.getY() + dy);
+    }
+      setRenderDirty();
   }
 
   public boolean mouseDragged(MouseEvent event) {
     // Move world if right mouse drag
     if (event.getButton() == RIGHT) {
-      for (Element child : getChildren()) {
-        float dx = mouseX - pmouseX;
-        float dy = mouseY - pmouseY;
-        child.setX(child.getX() + dx);
-        child.setY(child.getY() + dy);
-      }
-      setRenderDirty();
-      return false;
+       float dx = mouseX - pmouseX;
+       float dy = mouseY - pmouseY;
+       translate(8*dx*getWindow().getScaleX()/midiManager.getPPQ(), 8*dy*getWindow().getScaleY()/midiManager.getPPQ());
+       return false;
     }
     return super.mouseDragged(event);
   }
@@ -619,6 +628,7 @@ class Button extends DynamicContainer {
   private Label label = null;
   protected boolean pressed = false;
   private int textSize = 14;
+  private boolean active = true;
 
   public Button() {
     super();
@@ -649,6 +659,9 @@ class Button extends DynamicContainer {
     getChildren().clear();
     add(label);
   }
+  public void activate() { active=true; }
+  public void deactivate() { active=false; }
+  public boolean isActive() { return active; }
 
   public void action() { }
 
@@ -696,6 +709,12 @@ class Button extends DynamicContainer {
     stroke(pressed ? dark : darker);
     strokeWeight(0.5);
     rect(getX(), getY(), getWidth(), getHeight(), 6);
+    
+    if (!active) {
+      fill(127, 120);
+      noStroke();
+      rect(getX(), getY(), getWidth(), getHeight(), 6);
+    }
   }
 }
 
@@ -899,6 +918,9 @@ public class Controller extends DynamicContainer {
   }
   
   public void action() {}
+  public void activate() { active=true; }
+  public void deactivate() { active=false; }
+  public boolean isActive() { return active; }
   
   public void setBoundaries(float min, float max) { minValue=min; maxValue=max; }
   
@@ -910,8 +932,7 @@ public class Controller extends DynamicContainer {
     knob.setAngle(-angle);
     setRenderDirty();
   }
-  public void activate() { active=true; }
-  public void deactivate() { active=false; }
+
   
   public boolean mouseDragged(MouseEvent event) {
     if (active) {
@@ -941,5 +962,108 @@ public class Controller extends DynamicContainer {
       noStroke();
       rect(getX(), getY(), getWidth(), getHeight(), 6);
     }
+  }
+}
+
+
+
+/***************************************************
+ ********************* TOOL BAR ********************
+ ***************************************************/
+class ToolBar extends DynamicContainer {
+  public ToolBar() {
+    super();
+    setAlign(ALIGN_ROW);
+    //setColor(color(180));
+    setSpacing(4);
+    setPadding(3);
+    
+    DynamicContainer transport = new DynamicContainer();
+    transport.setSpacing(3);
+    transport.setPadding(2);
+    add(transport);
+    Button playBtn = new PlayButton("PLAY");
+    transport.add(playBtn);
+    Button stopBtn = new StopButton("STOP");
+    transport.add(stopBtn);
+    transport.setAlign(ALIGN_COLUMN + ALIGN_VERTICALLY);
+    
+    Controller tempoCtrl = new TempoController("BPM");
+    tempoCtrl.setBoundaries(20, 400);
+    tempoCtrl.setValue(120);
+    add(tempoCtrl);
+  }
+  
+  public void setColor(color c) {
+    super.setColor(colMult(c, 1.4));
+  }
+  
+  public void render() {
+    noStroke();
+    fill(col);
+    rect(getX(), getY(), getWidth(), getHeight());
+    super.render();
+    stroke(dark);
+    strokeWeight(1.6);
+    line(getX(), getHeight(), getWidth(), getHeight());
+  }
+  
+  class PlayButton extends Button {
+    public PlayButton(String s) {
+      super(s);
+    }
+    public void action() {
+      midiManager.play();
+    }
+  }
+  class StopButton extends Button {
+    public StopButton(String s) {
+      super(s);
+    }
+    public void action() {
+      midiManager.stopAndRewind();
+    }
+  }
+  class TempoController extends Controller {
+    public TempoController(String s) {
+      super(s);
+    }
+    public void action() {
+      midiManager.setBpm(getValue());
+    }
+  }
+}
+
+
+
+/***************************************************
+ ******************* BOTTOM BAR ********************
+ ***************************************************/
+class BottomBar extends Container {
+  public DynamicContainer center = new DynamicContainer();
+
+  public BottomBar() {
+    super();
+    setPadding(3);
+    setAlign(ALIGN_VERTICALLY);
+    center.setSpacing(3);
+    center.setAlign(ALIGN_ROW);
+    add(center);
+  }
+  
+  public void setColor(color c) {
+    super.setColor(colMult(c, 1.4));
+  }
+  
+  public void render() {
+    fill(col);
+    noStroke();
+    rect(getX(), getY(), getWidth(), getHeight());
+    
+    stroke(dark);
+    float weight = 1.6;
+    strokeWeight(weight);
+    line(getX(), getY(), getX()+width, getY());
+    super.render();
   }
 }
