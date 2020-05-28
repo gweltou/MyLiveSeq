@@ -285,7 +285,12 @@ public class MyTrack {
   public int getOctave() { 
     return octave;
   }
-
+  public long getTick() {
+        long total = tickcount;
+        for (int i=0; i<patternIdx; i++) {
+            total += patterns.get(i).getLength();
+        }
+        return total; }
   public void rewind() {
     patternIdx = 0;
     tickcount = 0;
@@ -706,7 +711,7 @@ public class MidiManager extends Thread {
       }
       songTick += 1;
     }
-    localTick += 1;
+    //localTick += 1;
   }
 
   public void run () {

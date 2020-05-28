@@ -587,7 +587,7 @@ class TracksWindow extends Window {
       // Draw tick progress bar
       noStroke();
       fill(0, 32);
-      float tx = midiManager.getSongTick()*getScaleX()/midiManager.getPPQ();
+      float tx = ((TrackContainer) getParent()).getTrack().getTick()*getScaleX()/midiManager.getPPQ();
       rect(getX(), getY(), tx, getHeight());
       
       unsetRenderDirty();
