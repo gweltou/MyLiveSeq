@@ -54,36 +54,64 @@ class PatternWindow extends Window {
   public boolean keyPressed(KeyEvent event) {
     // Zoom In/Out
     if (event.getKey() == 'a') {
-      setScaleX(getScaleX()/2);
-      //centerPane.translate(-centerPane.getTranslateX()*getScaleX(), 0);
+      centerPane.translate(-width/2, 0);
+      centerPane.scaleX(1.5);
+      centerPane.translate(width/2, 0);
       //tracksContainer.refresh();
       centerPane.setRenderDirty();
     } else if (event.getKey() == 'z') {
-      setScaleX(getScaleX()*2);
-      //centerPane.translate(centerPane.getTranslateX()*getScaleX(), 0);
-      //tracksContainer.refresh();
+      centerPane.translate(-width/2, 0);
+      centerPane.scaleX(0.5);
+      centerPane.translate(width/2, 0);
       centerPane.setRenderDirty();
     }
     return false;
   }
   
   private class PatternDragPane extends DragPane {
+    private float scaleX = 1;
+    
     public PatternDragPane() { super(); }
-  }
-  
-  private class NoteUI extends Element {
-    public NoteUI(MidiNote note) {
-      super();
-      setX(note.getStart()/midiManager.getPPQ());
-      setY(128-note.getPitch());
-      setSize(note.getDuration()/midiManager.getPPQ(), 1);
+    
+    public void scaleX(float factor) {
+      scaleX *= factor;
+      for (Element child : getChildren()) {
+        ((NoteUI) child).scaleX(factor);
+      }
     }
     
     public void render() {
-      println("PatternWindow centerpane: render");
+      super.render();
+    }
+  }
+  
+  
+  
+  /***************************************************
+  *******************  NOTE UI  **********************
+  ***************************************************/
+  private class NoteUI extends Element {
+    private MidiNote note;
+    
+    public NoteUI(MidiNote note) {
+      super();
+      this.note = note;
+      setX(note.getStart()/midiManager.getPPQ());
+      setY((128-note.getPitch())*getScaleY());
+      setSize((float) note.getDuration()/midiManager.getPPQ(), 1);
+      scaleX(8);
+    }
+    
+    public void scaleX(float factor) {
+      setX(factor*getX());
+      setSize(factor*getWidth(), getHeight());
+    }
+    
+    public void render() {
       strokeWeight(4);
       stroke(0, 120);
-      line(getX()*getScaleX(), getY()*getScaleY(), getScaleX()*(getX()+getWidth()), getY()*getScaleY());
+      //println(getX() + " " + getY() + " " + getWidth());
+      line(getX(), getY(), getX()+getWidth(), getY());
     }
   }
   

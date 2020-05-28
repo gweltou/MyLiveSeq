@@ -105,13 +105,31 @@ class TracksWindow extends Window {
   public boolean keyPressed(KeyEvent event) {
     // Zoom In/Out
     if (event.getKey() == 'a') {
+      centerPane.translate(-width/2, 0);
       setScaleX(getScaleX()/2);
-      //centerPane.translate(-centerPane.getTranslateX()*getScaleX(), 0);
+      /*for (Element child : tracksContainer.getChildren()) {
+        if (child.getClass() == TrackContainer.class) {
+          for (PatternUI pui : ((TrackContainer) child).getPattern()) {
+            pui.scaleX(1.5);
+          }
+        }
+      }*/
+      
+      centerPane.translate(width/2, 0);
       tracksContainer.refresh();
       centerPane.setRenderDirty();
     } else if (event.getKey() == 'z') {
+      centerPane.translate(-width/2, 0);
       setScaleX(getScaleX()*2);
-      //centerPane.translate(centerPane.getTranslateX()*getScaleX(), 0);
+      /*for (Element child : tracksContainer.getChildren()) {
+        if (child.getClass() == TrackContainer.class) {
+          for (PatternUI pui : ((TrackContainer) child).getPattern()) {
+            pui.scaleX(0.5);
+          }
+        }
+      }*/
+      
+      centerPane.translate(width/2, 0);
       tracksContainer.refresh();
       centerPane.setRenderDirty();
     } else if (event.getKey() == DELETE) {
@@ -415,6 +433,13 @@ class TracksWindow extends Window {
       }
     }
     
+    public ArrayList<PatternUI> getPattern() {
+      ArrayList<PatternUI> puis = new ArrayList<PatternUI>();
+      for (Element pui : patterns.getChildren()) {
+        puis.add((PatternUI) pui);
+      }
+      return puis;
+    }
     public void addPattern(PatternUI patternUI) {
       println("UI: pattern added");
       println("    length "+patternUI.getPattern().getLength());
@@ -562,7 +587,7 @@ class TracksWindow extends Window {
       // Draw tick progress bar
       noStroke();
       fill(0, 32);
-      float tx = midiManager.getTick()*getScaleX()/midiManager.getPPQ();
+      float tx = midiManager.getSongTick()*getScaleX()/midiManager.getPPQ();
       rect(getX(), getY(), tx, getHeight());
       
       unsetRenderDirty();
@@ -577,6 +602,7 @@ class TracksWindow extends Window {
   class PatternUI extends Element {
     // PatternUI should not be confused with Pattern class
     private final Pattern pattern;
+    private long lastClick = 0;
 
     public PatternUI(Pattern p) {
       super();
@@ -596,9 +622,25 @@ class TracksWindow extends Window {
     public float getWidth() { return super.getWidth() * getScaleX(); }
     public float getHeight() { return super.getHeight() * getScaleY(); }
     
+    // XXX
+    /*public void scaleX(float factor) {
+      setX(factor*getX());
+      print("scale from "+getWidth()+" to ");
+      setSize(factor*getWidth(), getHeight());
+      println(getWidth());
+    }*/
+      
+    
     public boolean mouseClicked(MouseEvent event) {
       registerSelected(this);
       println("UI: Pattern selected");
+      
+      if (System.currentTimeMillis()-lastClick < 200) {
+        // Double-click, play pattern
+        println("play pattern");
+        midiManager.playPattern(pattern);
+      }
+      lastClick = System.currentTimeMillis();
       
       // Cut pattern in two if CTRL key is down
       if(getTrackUI()!=null && event.isControlDown()) {

@@ -1,7 +1,7 @@
 import java.util.concurrent.Callable;
 
 static final boolean DEBUG = false;
-static final boolean LAZY_RENDERING = true;
+static final boolean LAZY_RENDERING = false;
 
 
 static final int ALIGN_ROW = 1;

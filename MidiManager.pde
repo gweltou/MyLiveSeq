@@ -354,13 +354,13 @@ public class MidiManager extends Thread {
   private final boolean[] onNotes = new boolean[16*128];  // 16 midi channels, 128 pitches per channel
   public boolean running;
   public boolean recording;
-  private Pattern pattern;
+  private Pattern activePattern;
   private boolean patternPlaying = false;
-  private long patternStartTime;
-  private long patternLength;
+  private long patternTick;
+  private long songTick;
   private MyTrack soloTrack;
   private long lastTickTime;
-  private long localTicks;
+  private long localTick;
   private long lastLocalTickTime;
   private long localTickDuration;
   private long externalTickDuration;
@@ -462,7 +462,7 @@ public class MidiManager extends Thread {
       if (message.getStatus() == ShortMessage.TIMING_CLOCK) {
         // Ignore clock timing messages for now
       } else if (readBufferIndex < readBuffer.length) {
-        readBuffer[readBufferIndex++] = new MidiEvent(message, localTicks);
+        readBuffer[readBufferIndex++] = new MidiEvent(message, localTick);
       }
     }
 
@@ -557,6 +557,7 @@ public class MidiManager extends Thread {
   public void stopAndRewind() {
     println("MM: stop and rewind");
     running = false;
+    patternPlaying = false;
     // turn off remaining on notes to avoid stuck notes
     for (int channel=0; channel<16; channel++) {
       for (int pitch=0; pitch<128; pitch++) {
@@ -573,7 +574,7 @@ public class MidiManager extends Thread {
       }
     }
     eventQueue.clear();
-    localTicks = 0;
+    songTick = 0;
 
     for (MyTrack track : tracks) {
       track.rewind();
@@ -594,31 +595,21 @@ public class MidiManager extends Thread {
     return soloTrack;
   }
 
-  public void loadPattern(Pattern pattern) {
-    this.pattern = pattern;
-    patternLength = pattern.getLength() * tickResolution;
-  }
-
-  public void playPattern() {
-    patternStartTime = localTicks;
+  public void playPattern(Pattern pattern) {
+    activePattern = pattern;
+    patternTick = 0;
     patternPlaying = true;
     running = true;
     println("MM: Pattern loop started");
   }
 
-  public long getPatternTime() { 
-    return localTicks-patternStartTime;
-  }
-
-  public boolean isRunning() { 
-    return running;
-  }
+  public boolean isRunning() { return running; }
 
   public void startRecording(Pattern pattern) {
     if (isRecording()) {
     } else {
       println("MM: Recording started");
-      this.pattern = pattern;
+      activePattern = pattern;
       recording = true;
       Arrays.fill(activeNotesVel, 0);
     }
@@ -635,9 +626,9 @@ public class MidiManager extends Thread {
     println("MM: BPM set to " + newBpm);
   }
 
-  public long getTick() {
-    return localTicks;
-  }
+  public long getTick() { return localTick; }
+  public long getSongTick() { return songTick; }
+  public long getPatternTick() { return patternTick; }
 
   public long getPPQ() {
     return tickResolution;
@@ -661,7 +652,6 @@ public class MidiManager extends Thread {
         // Update local ticks (may have a greater resolution that default Midi ticks)
         if (now - lastLocalTickTime >= localTickDuration) {
           tick();
-          localTicks += 1;
           lastLocalTickTime += localTickDuration;
         }
         if ((midiOut != null) && (now - lastTickTime > externalTickDuration)) {
@@ -677,7 +667,7 @@ public class MidiManager extends Thread {
       }
 
       // Send queued Midi events to midiOut
-      while (!eventQueue.isEmpty() && eventQueue.peek().getTick() <= localTicks) {
+      while (!eventQueue.isEmpty() && eventQueue.peek().getTick() <= localTick) {
         ShortMessage nextMessage = (ShortMessage) eventQueue.poll().getMessage();
         if ((nextMessage.getStatus()&0xF0) == ShortMessage.NOTE_ON) {
           // Register note on (used to cleanly turn notes off when needed)
@@ -692,10 +682,18 @@ public class MidiManager extends Thread {
   }
 
   private void tick() {
-    // Song mode
-    if (!patternPlaying) {
+    if (patternPlaying) {
+      if (patternTick == 0) {
+        eventQueue.addAll(activePattern.asEvents(1, localTick));
+      }
+      patternTick += 1;
+      if (patternTick >= activePattern.getLength()) {
+        patternTick = 0;
+      }
+    } else {
+      // Song mode
       for (MyTrack t : tracks) {
-        ArrayList<MidiEvent> trackEvents = t.tick(localTicks);
+        ArrayList<MidiEvent> trackEvents = t.tick(localTick);
         if (trackEvents == null)
           continue;
         if (soloTrack == null) {
@@ -706,7 +704,9 @@ public class MidiManager extends Thread {
           }
         }
       }
+      songTick += 1;
     }
+    localTick += 1;
   }
 
   public void run () {
