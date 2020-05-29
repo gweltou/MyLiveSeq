@@ -1,7 +1,7 @@
 import java.util.concurrent.Callable;
 
 static final boolean DEBUG = false;
-static final boolean LAZY_RENDERING = false;
+static final boolean LAZY_RENDERING = true;
 
 
 static final int ALIGN_ROW = 1;
@@ -223,7 +223,6 @@ class Window extends Container {
   
   public void show() {
     ui.setWindow(this);
-    background(0,255,0);
     //render();
   }
 

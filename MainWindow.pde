@@ -54,6 +54,11 @@ class TracksWindow extends Window {
     centerPane.setRenderDirty();
   }
   
+  public void show() {
+    super.show();
+    midiManager.songMode();
+  }
+  
   public void render() {
     // Load a new midi file from fileSelector
     if (fileToLoad != null) {
@@ -635,9 +640,8 @@ class TracksWindow extends Window {
       registerSelected(this);
       println("UI: Pattern selected");
       
-      if (System.currentTimeMillis()-lastClick < 200) {
+      if (System.currentTimeMillis()-lastClick < 330) {
         // Double-click, play pattern
-        println("play pattern");
         midiManager.playPattern(pattern);
       }
       lastClick = System.currentTimeMillis();
@@ -761,8 +765,8 @@ class TracksWindow extends Window {
         float startX = getX() + note.getStart()*getScaleX()/ppq;
         float endX = getX() + note.getEnd()*getScaleX()/ppq;
         // Crop notes that are after end of pattern
-        if (endX > getWidth())
-          break;
+        //if (endX > getWidth())
+        //  break;
         line(startX, getY()+64-0.5*pitch, endX, getY()+64-0.5*pitch);
       }
       

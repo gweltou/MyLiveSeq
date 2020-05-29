@@ -36,6 +36,8 @@ class PatternWindow extends Window {
   }
   
   public void setPattern(Pattern pattern) {
+    midiManager.stopAndRewind();
+    midiManager.playPattern(pattern);
     this.pattern = pattern;
     centerPane.clear();
     for (MidiNote midiNote : pattern.getNotes()) {
@@ -98,7 +100,7 @@ class PatternWindow extends Window {
       this.note = note;
       setX(note.getStart()/midiManager.getPPQ());
       setY((128-note.getPitch())*getScaleY());
-      setSize((float) note.getDuration()/midiManager.getPPQ(), 1);
+      setSize((float) note.getDuration()/midiManager.getPPQ(), getScaleY());
       scaleX(8);
     }
     
@@ -108,10 +110,15 @@ class PatternWindow extends Window {
     }
     
     public void render() {
-      strokeWeight(4);
-      stroke(0, 120);
+      noStroke();
+      fill(0, col);
       //println(getX() + " " + getY() + " " + getWidth());
-      line(getX(), getY(), getX()+getWidth(), getY());
+      rect(getX(), getY(), getWidth(), getHeight());
+    }
+    
+    public boolean mouseDragged(MouseEvent event) {
+      println("note dragged");
+      return true;
     }
   }
   
