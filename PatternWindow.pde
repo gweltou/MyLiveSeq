@@ -8,12 +8,6 @@ class PatternWindow extends Window {
   private final PatternDragPane centerPane;
   private Pattern pattern;
   
-  //private final TracksDragPane centerPane;
-  
-  //centerPane = new TracksDragPane();
-  //centerPane.setSize(width, height);
-  //add(centerPane);
-  
   public PatternWindow(UI ui) {
     super(ui);
     setWindow(this);
@@ -59,7 +53,6 @@ class PatternWindow extends Window {
       centerPane.translate(-width/2, 0);
       centerPane.scaleX(1.5);
       centerPane.translate(width/2, 0);
-      //tracksContainer.refresh();
       centerPane.setRenderDirty();
     } else if (event.getKey() == 'z') {
       centerPane.translate(-width/2, 0);
@@ -111,13 +104,26 @@ class PatternWindow extends Window {
     
     public void render() {
       noStroke();
-      fill(0, col);
+      fill(col);
       //println(getX() + " " + getY() + " " + getWidth());
       rect(getX(), getY(), getWidth(), getHeight());
     }
     
     public boolean mouseDragged(MouseEvent event) {
-      println("note dragged");
+      if (getDragged() == null) {
+        registerDragged(this);
+      }
+      if (getDragged() == this) {
+        println("note dragged");
+      }
+      float dx = mouseX - pmouseX;
+      float dy = mouseY - pmouseY;
+      setX(getX() + dx);
+      setY(getY() + dy);
+      return true;
+    }
+    public boolean mouseReleased(MouseEvent event) {
+      println("note released");
       return true;
     }
   }
