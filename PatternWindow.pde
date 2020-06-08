@@ -7,11 +7,12 @@ class PatternWindow extends Window {
   private final PatternToolBar toolBar;
   private final PatternDragPane centerPane;
   private Pattern pattern;
+  private Affine2 transform = new Affine2();
   
   public PatternWindow(UI ui) {
     super(ui);
     setWindow(this);
-    setScaleY(5);
+    transform.scale(8, 5);
     setColor(color(127));
     
     centerPane = new PatternDragPane();
@@ -49,30 +50,33 @@ class PatternWindow extends Window {
   
   public boolean keyPressed(KeyEvent event) {
     // Zoom In/Out
-    if (event.getKey() == 'a') {
-      centerPane.translate(-width/2, 0);
-      centerPane.scaleX(1.5);
-      centerPane.translate(width/2, 0);
+    if (key=='a') {
+      Affine2 inverted = new Affine2(transform).inv();
+      PVector center = new PVector(mouseX, mouseY);
+      inverted.applyTo(center);
+      transform.translate(center.x, center.y).scale(1.3, 1.3).translate(-center.x, -center.y);
       centerPane.setRenderDirty();
-    } else if (event.getKey() == 'z') {
-      centerPane.translate(-width/2, 0);
-      centerPane.scaleX(0.5);
-      centerPane.translate(width/2, 0);
+    } else if (key=='z') {
+      Affine2 inverted = new Affine2(transform).inv();
+      PVector center = new PVector(mouseX, mouseY);
+      inverted.applyTo(center);
+      transform.translate(center.x, center.y).scale(0.8, 0.8).translate(-center.x, -center.y);
       centerPane.setRenderDirty();
     }
     return false;
   }
   
   private class PatternDragPane extends DragPane {
-    private float scaleX = 1;
-    
     public PatternDragPane() { super(); }
     
-    public void scaleX(float factor) {
-      scaleX *= factor;
-      for (Element child : getChildren()) {
-        ((NoteUI) child).scaleX(factor);
+    public boolean mouseDragged(MouseEvent event) {
+      // Move world if right mouse drag
+      if (event.getButton() == RIGHT) {
+         float dx = mouseX - pmouseX;
+         float dy = mouseY - pmouseY;
+         transform.translate(dx/transform.m00, dy/transform.m11);
       }
+      return false;
     }
     
     public void render() {
@@ -87,26 +91,23 @@ class PatternWindow extends Window {
   ***************************************************/
   private class NoteUI extends Element {
     private MidiNote note;
+    //private PVector viewPos;
     
     public NoteUI(MidiNote note) {
       super();
       this.note = note;
       setX(note.getStart()/midiManager.getPPQ());
-      setY((128-note.getPitch())*getScaleY());
-      setSize((float) note.getDuration()/midiManager.getPPQ(), getScaleY());
-      scaleX(8);
-    }
-    
-    public void scaleX(float factor) {
-      setX(factor*getX());
-      setSize(factor*getWidth(), getHeight());
+      setY(128-note.getPitch());
+      setSize((float) note.getDuration()/midiManager.getPPQ(), 1);
     }
     
     public void render() {
       noStroke();
       fill(col);
       //println(getX() + " " + getY() + " " + getWidth());
-      rect(getX(), getY(), getWidth(), getHeight());
+      PVector pos = new PVector(getX(), getY());
+      transform.applyTo(pos);
+      rect(pos.x, pos.y, getWidth()*transform.m00, getHeight()*transform.m11);
     }
     
     public boolean mouseDragged(MouseEvent event) {
@@ -124,6 +125,9 @@ class PatternWindow extends Window {
     }
     public boolean mouseReleased(MouseEvent event) {
       println("note released");
+      println("before: " + note.getPitch());
+      int newPitch = 128 - round(getY() / getScaleY());
+      println("after: " + newPitch);
       return true;
     }
   }

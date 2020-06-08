@@ -22,10 +22,9 @@ public color dark(color c) { return colMult(c, 0.75); }
 public color darker(color c) { return colMult(c, 0.5); }
 public color colMult(color c, float mul) {
   // not sure if clamping is needed...
-  color col = color(min(255, red(c)*mul),
-                    min(255, green(c)*mul),
-                    min(255, blue(c)*mul));
-  return col;
+  return color(constrain(red(c)*mul, 0, 255),
+               constrain(green(c)*mul, 0, 255),
+               constrain(blue(c)*mul, 0, 255));
 }
 public color colSat(color c, float amp) {
   float r = red(c);

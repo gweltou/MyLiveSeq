@@ -13,10 +13,10 @@ import java.util.Collections;
 
 
 public class MidiNote {
-  private final int pitch;
-  private final int velocity;
-  private final long start;
-  private final long duration;
+  private int pitch;
+  private int velocity;
+  private long start;
+  private long duration;
 
   public MidiNote(int pitch, int velocity, long start, long duration) {
     this.pitch = pitch;
@@ -28,6 +28,7 @@ public class MidiNote {
   public int getPitch() { 
     return pitch;
   }
+  public void setPitch(int p) { pitch = p; }
   public int getVelocity() { 
     return velocity;
   }
