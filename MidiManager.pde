@@ -25,22 +25,15 @@ public class MidiNote {
     this.duration = duration;
   }
 
-  public int getPitch() { 
-    return pitch;
-  }
+  public int getPitch() { return pitch; }
   public void setPitch(int p) { pitch = p; }
-  public int getVelocity() { 
-    return velocity;
-  }
-  public long getStart() { 
-    return start;
-  }
-  public long getEnd() { 
-    return start+duration;
-  }
-  public long getDuration() { 
-    return duration;
-  }
+  public int getVelocity() { return velocity; }
+  public void setVelocity(int v) { velocity = v; }
+  public long getStart() { return start; }
+  public void setStart(long s) { start = s; }
+  public long getEnd() { return start+duration; }
+  public long getDuration() { return duration; }
+  public void setDuration(long d) { duration = d; }
 
   public ArrayList<MidiEvent> asEvents(int channel, long offset) {
     ArrayList<MidiEvent> events = new ArrayList(2);
@@ -55,12 +48,12 @@ public class MidiNote {
     }
     return events;
   }
+}
 
-  public class NoteComparator implements Comparator<MidiNote> {
-    @Override
-      public int compare(MidiNote o1, MidiNote o2) {
-      return Long.compare(o1.getStart(), o2.getStart());
-    }
+public static class NoteComparator implements Comparator<MidiNote> {
+  @Override
+    public int compare(MidiNote o1, MidiNote o2) {
+    return Long.compare(o1.getStart(), o2.getStart());
   }
 }
 
@@ -145,14 +138,18 @@ public class Pattern {
 
   public void addNote(MidiNote note) { 
     midiNotes.add(note);
-    Collections.sort(midiNotes, note.new NoteComparator());  // UGLY, didn't find a way around
+    sort();
   }
   public void addNotes(ArrayList<MidiNote> notes) {
     midiNotes.addAll(notes);
-    Collections.sort(midiNotes, notes.get(0).new NoteComparator()); // UGLY
+    sort();
   }
   public ArrayList<MidiNote> getNotes() {
     return midiNotes;
+  }
+  public void remove(MidiNote note) { midiNotes.remove(note); }
+  public void sort() {
+    Collections.sort(midiNotes, new NoteComparator());
   }
 
   public ArrayList<MidiEvent> asEvents(int channel, long offset) {

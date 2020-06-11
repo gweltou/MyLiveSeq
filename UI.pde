@@ -1,7 +1,7 @@
 import java.util.concurrent.Callable;
 
 static final boolean DEBUG = false;
-static final boolean LAZY_RENDERING = false;
+static final boolean LAZY_RENDERING = true;
 
 
 static final int ALIGN_ROW = 1;
@@ -160,7 +160,10 @@ class Element {
       return getY();
     return getParent().getAbsoluteY() + getParent().getPadding() + getY();
   }
-
+  public boolean containsPoint(float x, float y) {
+    return x > getX() && x < (getX()+getWidth()) &&
+      y > getY() && y < (getY()+getHeight());
+  }
   public boolean containsAbsolutePoint(float x, float y) {
     if (DEBUG) {
       stroke(255,0,0);
