@@ -84,8 +84,11 @@ class TracksWindow extends Window {
     //if (getDragged() != null && getDragged().getClass()==PatternUI.class) {
     //  getDragged().render();
     //}
-    if (DEBUG && renderCount > 0)
+    if (DEBUG && renderCount > 0) {
       println("renderCount: " + renderCount);
+      loadPixels();
+      updatePixels();
+    }
   }
   
   public void addTrack(TrackContainer trackContainer) {
@@ -612,7 +615,7 @@ class TracksWindow extends Window {
     public PatternUI(Pattern p) {
       super();
       pattern = p;
-      setSize(p.getLength()/(float) midiManager.getPPQ(), 64);
+      setSize((float) p.getLength()/midiManager.getPPQ(), 64);
     }
     
     public Pattern getPattern() { return pattern; }

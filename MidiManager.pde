@@ -1,4 +1,3 @@
-
 import javax.sound.midi.*;
 import java.io.File;
 import java.io.IOException;
@@ -12,6 +11,10 @@ import java.util.logging.Logger;
 import java.util.Collections;
 
 
+
+/***************************************************
+ *****************   MIDI NOTE   *******************
+ ***************************************************/
 public class MidiNote {
   private int pitch;
   private int velocity;
@@ -25,15 +28,33 @@ public class MidiNote {
     this.duration = duration;
   }
 
-  public int getPitch() { return pitch; }
-  public void setPitch(int p) { pitch = p; }
-  public int getVelocity() { return velocity; }
-  public void setVelocity(int v) { velocity = v; }
-  public long getStart() { return start; }
-  public void setStart(long s) { start = s; }
-  public long getEnd() { return start+duration; }
-  public long getDuration() { return duration; }
-  public void setDuration(long d) { duration = d; }
+  public int getPitch() { 
+    return pitch;
+  }
+  public void setPitch(int p) { 
+    pitch = p;
+  }
+  public int getVelocity() { 
+    return velocity;
+  }
+  public void setVelocity(int v) { 
+    velocity = v;
+  }
+  public long getStart() { 
+    return start;
+  }
+  public void setStart(long s) { 
+    start = s;
+  }
+  public long getEnd() { 
+    return start+duration;
+  }
+  public long getDuration() { 
+    return duration;
+  }
+  public void setDuration(long d) { 
+    duration = d;
+  }
 
   public ArrayList<MidiEvent> asEvents(int channel, long offset) {
     ArrayList<MidiEvent> events = new ArrayList(2);
@@ -59,6 +80,9 @@ public static class NoteComparator implements Comparator<MidiNote> {
 
 
 
+/***************************************************
+ ******************    PATTERN    ******************
+ ***************************************************/
 public class Pattern {
   /*
      *  TimeStamps for Midi events are expressed in beats relative to the pattern start time
@@ -147,7 +171,9 @@ public class Pattern {
   public ArrayList<MidiNote> getNotes() {
     return midiNotes;
   }
-  public void remove(MidiNote note) { midiNotes.remove(note); }
+  public void remove(MidiNote note) { 
+    midiNotes.remove(note);
+  }
   public void sort() {
     Collections.sort(midiNotes, new NoteComparator());
   }
@@ -207,6 +233,9 @@ public class Pattern {
 
 
 
+/***************************************************
+ ******************     TRACK    *******************
+ ***************************************************/
 public class MyTrack {
   /*
    *  Paramètres :
@@ -344,7 +373,11 @@ public class MyTrack {
 
 
 
+/***************************************************
+ ****************** MIDI MANAGER *******************
+ ***************************************************/
 public class MidiManager extends Thread {
+  private boolean stopThread;    // MidiManager stops when stopThread is set to false
   private final ArrayList<MyTrack> tracks = new ArrayList();
   private final PriorityQueue<MidiEvent> eventQueue;
   private final ArrayList<MidiDevice> transmitters = new ArrayList();
@@ -352,9 +385,9 @@ public class MidiManager extends Thread {
   private MidiDevice inputDevice, outputDevice;
   private MyMidiReceiver midiIn;
   private Receiver midiOut;
-  private boolean stopThread;    // MidiManager stops when stopThread is set to false
-  private final int[] activeNotesVel =  new int[128];
-  private final long[] activeNotesTime = new long[128];
+
+  //private final int[] activeNotesVel =  new int[128];
+  //private final long[] activeNotesTime = new long[128];
   private final boolean[] onNotes = new boolean[16*128];  // 16 midi channels, 128 pitches per channel
   public boolean running;
   public boolean recording;
@@ -370,11 +403,11 @@ public class MidiManager extends Thread {
   private long externalTickDuration;
   private final int tickResolution = 96; // Pulse Per Quarter note
   private boolean clockSlave;
-  private float bpm;
+
 
   public MidiManager() {
-    Arrays.fill(activeNotesVel, 0);
-    Arrays.fill(activeNotesTime, 0);
+    //Arrays.fill(activeNotesVel, 0);
+    //Arrays.fill(activeNotesTime, 0);
     Arrays.fill(onNotes, false);
     eventQueue = new PriorityQueue(32, new EventComparator());
     inputDevice = null;
@@ -612,7 +645,7 @@ public class MidiManager extends Thread {
     activePattern = pattern;
     patternTick = 0;
     patternPlaying = true;
-    running = true;
+    play();
     println("MM: Pattern loop started");
   }
 
@@ -626,7 +659,7 @@ public class MidiManager extends Thread {
       println("MM: Recording started");
       activePattern = pattern;
       recording = true;
-      Arrays.fill(activeNotesVel, 0);
+      //Arrays.fill(activeNotesVel, 0);
     }
   }
 
@@ -634,11 +667,10 @@ public class MidiManager extends Thread {
     return recording;
   }
 
-  public void setBpm(float newBpm) {
-    bpm = newBpm;
+  public void setBpm(float bpm) {
     externalTickDuration = Math.round(60000/(24 * bpm));   // 24 ticks per quarter-note
     localTickDuration = Math.round(60000/(tickResolution * bpm));
-    println("MM: BPM set to " + newBpm);
+    println("MM: BPM set to " + bpm);
   }
 
   public long getTick() { 
@@ -672,6 +704,7 @@ public class MidiManager extends Thread {
         long now = System.currentTimeMillis();
         // Update local ticks (may have a greater resolution that default Midi ticks)
         if (now - lastLocalTickTime >= localTickDuration) {
+          //println(now, lastLocalTickTime, now - lastLocalTickTime, localTickDuration);
           tick();
           lastLocalTickTime += localTickDuration;
         }
@@ -690,11 +723,14 @@ public class MidiManager extends Thread {
       // Send queued Midi events to midiOut
       while (!eventQueue.isEmpty() && eventQueue.peek().getTick() <= localTick) {
         ShortMessage nextMessage = (ShortMessage) eventQueue.poll().getMessage();
+        int channel = nextMessage.getChannel();
+        // Keep track of active notes (used to cleanly turn notes off when needed)
         if ((nextMessage.getStatus()&0xF0) == ShortMessage.NOTE_ON) {
-          // Register note on (used to cleanly turn notes off when needed)
-          int channel = ((ShortMessage) nextMessage).getChannel();
-          int pitch = ((ShortMessage) nextMessage).getData1();
+          int pitch = nextMessage.getData1();
           onNotes[128*channel + pitch] = true;
+        } else if ((nextMessage.getStatus()&0xF0) == ShortMessage.NOTE_OFF) {
+          int pitch = nextMessage.getData1();
+          onNotes[128*channel + pitch] = false;
         }
         if (midiOut != null)
           midiOut.send(nextMessage, -1);

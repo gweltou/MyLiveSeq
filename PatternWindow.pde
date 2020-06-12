@@ -13,7 +13,7 @@ class PatternWindow extends Window {
   public PatternWindow(UI ui) {
     super(ui);
     setWindow(this);
-    transform.scale(12, 6);
+    transform.scale(16, 5);
     setColor(color(127));
     
     notesContainer = new NotesContainer();
@@ -124,6 +124,13 @@ class PatternWindow extends Window {
       fill(250);
       rect(getX(), getY(), getWidth(), getHeight());
       super.render();
+      
+      // Play head
+      stroke(0, 255, 0, 128);
+      strokeWeight(2);
+      float patternTick = (float) midiManager.getPatternTick()*transform.m00/midiManager.getPPQ();
+      patternTick += transform.m02;
+      line(patternTick, getY(), patternTick, getY()+getHeight());
     }
   }
   
@@ -173,6 +180,7 @@ class PatternWindow extends Window {
         PVector pointer = new PVector(mouseX, mouseY-getParent().getY());
         unproject.applyTo(pointer);
         pointerOffset = pointer.x - getX();
+        println("offset ", pointerOffset);
       }
       if (getDragged() == this) {
         // event coordinates can't be trusted because event can be launched
@@ -181,6 +189,7 @@ class PatternWindow extends Window {
         PVector pointer = new PVector(mouseX, mouseY-getParent().getY());
         unproject.applyTo(pointer);
         
+        pointer.x -= pointerOffset;
         // Lock x position to midi resolution grid
         float subQuarterPos = pointer.x - floor(pointer.x);
         subQuarterPos = (float) round(subQuarterPos * midiManager.getPPQ()) / midiManager.getPPQ();
