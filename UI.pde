@@ -1,7 +1,7 @@
 import java.util.concurrent.Callable;
 
 static final boolean DEBUG = false;
-static final boolean LAZY_RENDERING = false;
+static final boolean LAZY_RENDERING = true;
 
 
 static final int ALIGN_ROW = 1;
@@ -799,19 +799,23 @@ class ToggleLed extends ToggleButton {
  ***************************************************/
 class TriStateButton extends ToggleButton {
   //private color col1, col2, col3;
-  private int state = 0;
+  protected int state = 0;
 
   public TriStateButton() {
     super();
   }
 
-  public void setState(int s) { 
-    state = s;
-  }
+  //public void setState(int s) { 
+  //  state = s;
+  //}
 
   public boolean mouseClicked(MouseEvent event) {
     super.mouseClicked(event);
-    state = (state+1)%3;
+    if (event.getButton() == RIGHT) {
+      state = (state-1+3)%3;
+    } else {
+      state = (state+1)%3;
+    }
     return true;
   }
 
@@ -819,20 +823,28 @@ class TriStateButton extends ToggleButton {
     noStroke();
     switch (state) {
     case 0: 
-      fill(darker, 120);
+      fill(80);
       ellipse(getX(), getY(), getWidth(), getHeight());
+      fill(255);
+      ellipse(getX()+1, getY()+1, getWidth()-2, getHeight()-2);
       break;
     case 1: 
-      fill(col, 100);
+      fill(80);
       ellipse(getX(), getY(), getWidth(), getHeight());
+      fill(255);
+      ellipse(getX()+1, getY()+1, getWidth()-2, getHeight()-2);
+      fill(80);
+      ellipse(getX()+3, getY()+3, getWidth()-6, getHeight()-6);
+      fill(255);
+      ellipse(getX()+4, getY()+4, getWidth()-8, getHeight()-8);
       break;
     case 2: 
-      fill(lighter, 40);
-      ellipse(getX()-2, getY()-2, getWidth()+4, getHeight()+4);
-      fill(lighter);
+      fill(80);
       ellipse(getX(), getY(), getWidth(), getHeight());
-      fill(255, 64);
-      ellipse(getX()+2, getY()+2, getWidth()-4, getHeight()-4);
+      fill(255);
+      ellipse(getX()+1, getY()+1, getWidth()-2, getHeight()-2);
+      fill(80);
+      ellipse(getX()+3, getY()+3, getWidth()-6, getHeight()-6);
       break;
     default: 
       break;

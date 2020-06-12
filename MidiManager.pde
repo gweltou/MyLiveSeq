@@ -264,7 +264,7 @@ public class MyTrack {
     noteIdx = 0;
     eventIdx = 0;
     mute = false;
-    playmode = LOOP_TRACK;
+    playmode = EOT;
     tickcount = 0;
   }
 
@@ -293,6 +293,7 @@ public class MyTrack {
   public int getChannel() { 
     return midiChannel;
   }
+  public void setMode(int mode) { playmode = mode; }
 
   public void mute() { 
     println("MM: track muted");
@@ -322,6 +323,7 @@ public class MyTrack {
   public void rewind() {
     patternIdx = 0;
     tickcount = 0;
+    noteIdx = 0;
   }
 
   public ArrayList<MidiEvent> tick(long localTick) {
@@ -330,13 +332,13 @@ public class MyTrack {
     if (patternIdx < patterns.size()) {
       ArrayList<MidiEvent> toPlay = new ArrayList(8);
 
-      if (tickcount == 0) {
+      /*if (tickcount == 0) {
         // Load current pattern
         events = patterns.get(patternIdx).asEvents(getChannel(), localTick);
         Collections.sort(events, midiManager.new EventComparator());
         eventIdx = 0;
         noteIdx = 0;
-      }
+      }*/
 
       if (!mute) {
         ArrayList<MidiNote> notes = patterns.get(patternIdx).getNotes();
@@ -356,13 +358,13 @@ public class MyTrack {
       tickcount++;
       if (tickcount >= patterns.get(patternIdx).getLength()) {
         tickcount = 0;
+        noteIdx = 0;
         if (playmode != LOOP_PATTERN) {
           patternIdx++;
         }
       }
       if (playmode == LOOP_TRACK && patternIdx>=patterns.size()) {
         patternIdx = 0;
-        tickcount = 0;
       }
 
       return toPlay;
@@ -670,7 +672,6 @@ public class MidiManager extends Thread {
   public void setBpm(float bpm) {
     externalTickDuration = Math.round(60000/(24 * bpm));   // 24 ticks per quarter-note
     localTickDuration = Math.round(60000/(tickResolution * bpm));
-    println("MM: BPM set to " + bpm);
   }
 
   public long getTick() { 

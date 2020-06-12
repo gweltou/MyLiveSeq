@@ -354,15 +354,10 @@ class TracksWindow extends Window {
       add(msButtons);
       msButtons.setPadding(3);
       msButtons.setSpacing(2);
-      msButtons.setAlign(ALIGN_COLUMN);
-      float toggleSize = 16;
-      
+      msButtons.setAlign(ALIGN_COLUMN);      
       msButtons.add(new MuteToggle());
       msButtons.add(new SoloToggle());
-      TriStateButton loopToggle = new TriStateButton();
-      loopToggle.setSizeFixed(toggleSize, toggleSize);
-      msButtons.add(loopToggle);
-      loopToggle.setColorFixed(color(240, 240, 0));
+      msButtons.add(new LoopToggle());
       
       // Patterns
       patterns = new PatternContainer();
@@ -424,6 +419,18 @@ class TracksWindow extends Window {
           release();
         }
         super.render();
+      }
+    }
+    private class LoopToggle extends TriStateButton {
+      public LoopToggle() {
+        super();
+        setSizeFixed(16, 16);
+        setColorFixed(color(240, 240, 0));
+      }
+      public boolean mouseClicked(MouseEvent event) {
+        super.mouseClicked(event);
+        track.setMode(state);
+        return true;
       }
     }
     
@@ -692,6 +699,9 @@ class TracksWindow extends Window {
       return false;
     }
     public boolean mouseDragged(MouseEvent event) {
+      if (event.getButton() == RIGHT)
+        return false;
+      
       if (getResized() == this) {
         // Resizing pattern
         float newSize = (mouseX-getAbsoluteX())/getScaleX();
