@@ -252,8 +252,12 @@ public class MyTrack {
   private int eventIdx;
   private long tickcount;
   private boolean mute;
-  private int playmode;
   private int octave;
+  private int semitone;
+  private float rndMel = 0.0;
+  private float rndRyt = 0.0;
+  
+  private int playmode;
   static public final int EOT = 0;            // Stop at end of track
   static public final int LOOP_TRACK = 1;     // Loop whole track
   static public final int LOOP_PATTERN = 2;   // Loop current pattern
@@ -313,6 +317,13 @@ public class MyTrack {
   public int getOctave() { 
     return octave;
   }
+  public int getSemitone() { return semitone; }
+  public void setSemitone(int s) { semitone = s; }
+  public float getRndMel() { return rndMel; }
+  public void setRndMel(float r) { rndMel = r; }
+  public float getRndRyt() { return rndRyt; }
+  public void setRndRyt(float r) { rndRyt = r; }
+  
   public long getTick() {
     long total = tickcount;
     for (int i=0; i<patternIdx; i++) {
@@ -345,9 +356,9 @@ public class MyTrack {
         MidiNote note;
         while (noteIdx<notes.size() && notes.get(noteIdx).getStart() <= tickcount) {
           note = notes.get(noteIdx);
-          if (octave != 0) {
-            // Transpose notes by octaves
-            note = new MidiNote(note.getPitch()+12*octave, note.getVelocity(), note.getStart(), note.getDuration());
+          if (octave != 0 || semitone != 0) {
+            // Transpose notes by octaves and semitones
+            note = new MidiNote(note.getPitch()+12*octave+semitone, note.getVelocity(), note.getStart(), note.getDuration());
           }
           ArrayList<MidiEvent> events = note.asEvents(getChannel(), localTick);
           toPlay.addAll(events);

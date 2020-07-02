@@ -28,11 +28,22 @@ class ConfigWindow extends Window {
     centerPane.add(outDevList);
     outDevList.setSpacing(3);
     outDevList.setPos(inDevList.getX()+inDevList.getWidth()+5, 30);
+    
     ArrayList<MidiDevice> outDevices = midiManager.getReceivers();
     for (MidiDevice device : outDevices) {
       outDevList.add(new DeviceButton(device));
     }
     outDevList.setAlign(ALIGN_COLUMN);
+    
+    // LABELS
+    Label inputLabel = new Label("Input Devices");
+    centerPane.add(inputLabel);
+    inputLabel.setTextSize(18);
+    inputLabel.setPos(inDevList.getX()+inDevList.getWidth()/2-inputLabel.getWidth()/2, 4);
+    Label outputLabel = new Label("Output Devices");
+    centerPane.add(outputLabel);
+    outputLabel.setTextSize(18);
+    outputLabel.setPos(outDevList.getX()+outDevList.getWidth()/2-outputLabel.getWidth()/2, 4);
     
     inDevList.select(midiManager.getInputDevice());
     outDevList.select(midiManager.getOutputDevice());

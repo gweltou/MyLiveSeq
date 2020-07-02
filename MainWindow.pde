@@ -199,6 +199,9 @@ class TracksWindow extends Window {
     private MyTrack track = null; // Selected track
     private ChannelController channelCtrl;
     private OctaveController octaveCtrl;
+    private TransposeController transposeCtrl;
+    private RndMelController rndMelCtrl;
+    private RndRytController rndRytCtrl;
     
     public TracksToolBar() {
       super();
@@ -208,31 +211,23 @@ class TracksWindow extends Window {
       add(spacer);
       
       channelCtrl = new ChannelController("CHAN");
-      channelCtrl.setBoundaries(1, 16);
-      channelCtrl.setValue(1);
-      channelCtrl.deactivate();
       add(channelCtrl);
-      
       octaveCtrl = new OctaveController("OCT");
-      octaveCtrl.setBoundaries(-4, 4);
-      octaveCtrl.setValue(0);
-      octaveCtrl.deactivate();
       add(octaveCtrl);
-      
-      Controller transposeCtrl = new Controller("TRA");
-      transposeCtrl.setBoundaries(-12, 12);
-      transposeCtrl.setValue(0);
+      transposeCtrl = new TransposeController("TRA");
       add(transposeCtrl);
+      
       Controller swingCtrl = new Controller("SWIN");
       add(swingCtrl);
       Controller speedCtrl = new Controller("SPEED");
       add(speedCtrl);
-      Controller randomMelCtrl = new Controller("RND Ml");
-      randomMelCtrl.setValue(0);
-      add(randomMelCtrl);
-      Controller randomRytCtrl = new Controller("RND Ry");
-      randomRytCtrl.setValue(0);
-      add(randomRytCtrl);
+      
+      RndMelController rndMelCtrl = new RndMelController("RND Ml");
+      //randomMelCtrl.setValue(0);
+      add(rndMelCtrl);
+      RndRytController rndRytCtrl = new RndRytController("RND Ry");
+      //randomRytCtrl.setValue(0);
+      add(rndRytCtrl);
       
       setSizeFixed(width, getHeight());
     }
@@ -244,15 +239,27 @@ class TracksWindow extends Window {
         channelCtrl.activate();
         octaveCtrl.setValue(track.getOctave());
         octaveCtrl.activate();
+        transposeCtrl.setValue(track.getSemitone());
+        transposeCtrl.activate();
+        //rndMelCtrl.setValue(track.getRndMel());
+        rndMelCtrl.activate();
+        rndRytCtrl.setValue(track.getRndRyt());
+        rndRytCtrl.activate();
       } else {
         channelCtrl.deactivate();
         octaveCtrl.deactivate();
+        transposeCtrl.deactivate();
+        rndMelCtrl.deactivate();
+        rndRytCtrl.deactivate();
       }
     }
     
     private class ChannelController extends Controller {
       public ChannelController(String s) {
         super(s);
+        setBoundaries(1, 16);
+        setValue(1);
+        deactivate();
       }
       public void action() {
         println(round(getValue()));
@@ -262,10 +269,46 @@ class TracksWindow extends Window {
     private class OctaveController extends Controller {
       public OctaveController(String s) {
         super(s);
+        setBoundaries(-4, 4);
+        setValue(0);
+        deactivate();
       }
       public void action() {
         println(round(getValue()));
         track.setOctave(round(getValue()));
+      }
+    }
+    private class TransposeController extends Controller {
+      public TransposeController(String s) {
+        super(s);
+        setBoundaries(-1, 1);
+        setValue(0);
+        deactivate();
+      }
+      public void action() {
+        track.setSemitone(round(getValue()));
+      }
+    }
+    private class RndMelController extends Controller {
+      public RndMelController(String s) {
+        super(s);
+        setBoundaries(-1, 1);
+        setValue(0);
+        deactivate();
+      }
+      public void action() {
+        track.setRndMel(getValue());
+      }
+    }
+    private class RndRytController extends Controller {
+      public RndRytController(String s) {
+        super(s);
+        setBoundaries(-1, 1);
+        setValue(0);
+        deactivate();
+      }
+      public void action() {
+        track.setRndRyt(getValue());
       }
     }
   }
