@@ -914,6 +914,7 @@ public class Controller extends DynamicContainer {
   private float rawValue;
   private float minValue = 0;
   private float maxValue = 127;
+  private boolean rounded = true;
 
   public Controller(String s) {
     super();
@@ -937,14 +938,23 @@ public class Controller extends DynamicContainer {
   public void activate() { active=true; }
   public void deactivate() { active=false; }
   public boolean isActive() { return active; }
+  public void setRounded(boolean b) { rounded=b; }
   
   public void setBoundaries(float min, float max) { minValue=min; maxValue=max; }
   
   public float getValue() { return rawValue; }
   public void setValue(float val) {
     rawValue = constrain(val, minValue, maxValue);
-    valueLabel.setValue(String.valueOf(round(rawValue)));
-    float angle = map(round(rawValue), minValue, maxValue, knob.getMinAngle(), knob.getMaxAngle());
+    float angle;
+    if (rounded) {
+      valueLabel.setValue(String.valueOf(round(rawValue)));
+      angle = map(round(rawValue), minValue, maxValue, knob.getMinAngle(), knob.getMaxAngle());
+    } else {
+      valueLabel.setValue(String.format("%.2f", rawValue));
+      // Center label position here
+      valueLabel.setX(0.5*getWidth() - 0.6*valueLabel.getWidth());
+      angle = map(rawValue, minValue, maxValue, knob.getMinAngle(), knob.getMaxAngle());
+    }
     knob.setAngle(-angle);
     setRenderDirty();
   }

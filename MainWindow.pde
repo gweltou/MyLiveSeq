@@ -222,10 +222,10 @@ class TracksWindow extends Window {
       Controller speedCtrl = new Controller("SPEED");
       add(speedCtrl);
       
-      RndMelController rndMelCtrl = new RndMelController("RND Ml");
+      rndMelCtrl = new RndMelController("RND Ml");
       //randomMelCtrl.setValue(0);
       add(rndMelCtrl);
-      RndRytController rndRytCtrl = new RndRytController("RND Ry");
+      rndRytCtrl = new RndRytController("RND Ry");
       //randomRytCtrl.setValue(0);
       add(rndRytCtrl);
       
@@ -241,7 +241,7 @@ class TracksWindow extends Window {
         octaveCtrl.activate();
         transposeCtrl.setValue(track.getSemitone());
         transposeCtrl.activate();
-        //rndMelCtrl.setValue(track.getRndMel());
+        rndMelCtrl.setValue(track.getRndMel());
         rndMelCtrl.activate();
         rndRytCtrl.setValue(track.getRndRyt());
         rndRytCtrl.activate();
@@ -281,7 +281,7 @@ class TracksWindow extends Window {
     private class TransposeController extends Controller {
       public TransposeController(String s) {
         super(s);
-        setBoundaries(-1, 1);
+        setBoundaries(-8, 8);
         setValue(0);
         deactivate();
       }
@@ -292,8 +292,9 @@ class TracksWindow extends Window {
     private class RndMelController extends Controller {
       public RndMelController(String s) {
         super(s);
-        setBoundaries(-1, 1);
+        setBoundaries(0, 1);
         setValue(0);
+        setRounded(false);
         deactivate();
       }
       public void action() {
@@ -303,8 +304,9 @@ class TracksWindow extends Window {
     private class RndRytController extends Controller {
       public RndRytController(String s) {
         super(s);
-        setBoundaries(-1, 1);
+        setBoundaries(0, 1);
         setValue(0);
+        setRounded(false);
         deactivate();
       }
       public void action() {

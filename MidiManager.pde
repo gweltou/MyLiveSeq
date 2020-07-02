@@ -270,6 +270,7 @@ public class MyTrack {
     mute = false;
     playmode = EOT;
     tickcount = 0;
+    //rndMel = 0f;
   }
 
   public void addPattern(Pattern pattern) {
@@ -320,7 +321,7 @@ public class MyTrack {
   public int getSemitone() { return semitone; }
   public void setSemitone(int s) { semitone = s; }
   public float getRndMel() { return rndMel; }
-  public void setRndMel(float r) { rndMel = r; }
+  public void setRndMel(float r) { rndMel = r; println(rndMel);}
   public float getRndRyt() { return rndRyt; }
   public void setRndRyt(float r) { rndRyt = r; }
   
@@ -641,7 +642,6 @@ public class MidiManager extends Thread {
 
   public void addTrack(MyTrack track) { 
     tracks.add(track);
-    println("MM: track added");
   }
 
   public void solo(MyTrack t) {
