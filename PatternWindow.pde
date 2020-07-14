@@ -220,10 +220,21 @@ class PatternWindow extends Window {
     public PatternToolBar() {
       super();
       setSizeFixed(width, getHeight());
+      
+      add(new ButtonRec());
     }
     
+    private class ButtonRec extends Button {
+      public ButtonRec() {
+        super("REC");
+      }
+      public void action() {
+        midiManager.startRecording(pattern);
+      }
+    }
+    /*
     private class OffsetButton extends Button {
-      
+      // Change pattern starting position
     }
     
     private class ButtonEdit extends Button {
@@ -231,6 +242,7 @@ class PatternWindow extends Window {
         super("Edit");
       }
     }
+    */
   }
   
   

@@ -1,15 +1,53 @@
-import javax.sound.midi.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.PriorityQueue;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.Collections;
+import javax.sound.midi.*;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.Clip;
+import javax.sound.sampled.LineUnavailableException;
 
+
+public ArrayList<MidiNote> algoMel1(ArrayList<MidiNote> notes, float prob) {
+  // Raise or lower notes by 1 octave
+  
+  ArrayList<MidiNote> mutated = new ArrayList<MidiNote>();
+  for (MidiNote n : notes) {
+    if (Math.random() < prob) {
+      int pitch = n.getPitch();
+      if (Math.random() < 0.5f) {
+        pitch = max(0, pitch-12);
+      } else {
+        pitch = min(127, pitch+12);
+      }
+      n = new MidiNote(pitch, n.getVelocity(), n.getStart(), n.getDuration());
+    }
+    mutated.add(n);
+  }
+  return mutated;
+}
+
+
+Clip beepHigh;
+Clip beepLow;
+public byte[] createSoundSample(float sampleRate, float hz, int cycles, float amp) {
+  float framesPerCycle = sampleRate/hz;
+  int nFrames = ceil(framesPerCycle * cycles);
+  float angleStep = TWO_PI / framesPerCycle;
+  byte[] data = new byte[2 * nFrames];
+  float angle = 0;
+  for (int i=0; i<nFrames; i++) {
+    short val = (short) (amp * pow(2, 15) * sin(angle));
+    angle += angleStep;
+    data[2*i] = (byte) ((val >> 8) & 0xFF);
+    data[2*i + 1] = (byte) (val & 0xFF);
+  }
+  return data;
+}
 
 
 /***************************************************
@@ -96,9 +134,10 @@ public class Pattern {
    *      Gamme
    *      Filter out CC
    */
-  private final ArrayList<MidiEvent> midiEvents = new ArrayList();
-  private final ArrayList<MidiNote> midiNotes = new ArrayList();
+  protected final ArrayList<MidiEvent> midiEvents = new ArrayList();
+  protected final ArrayList<MidiNote> midiNotes = new ArrayList();
   private long nTicks = 0;
+  private Pattern childPattern = null;
 
   public Pattern() { 
     this(32*midiManager.getPPQ());
@@ -111,7 +150,40 @@ public class Pattern {
     midiNotes.addAll(other.getNotes());
     midiEvents.addAll(other.getEvents());
   }
+  
+  public void algoMel1(float prob) {
+    ArrayList<MidiNote> mutated = this.algoMel1(this.midiNotes, prob);
+    childPattern = new Pattern();
+    childPattern.addNotes(mutated);
+  }
+  
+  public ArrayList<MidiNote> algoMel1(ArrayList<MidiNote> notes, float prob) {
+    // Raise or lower notes by 1 octave
+    
+    ArrayList<MidiNote> mutated = new ArrayList<MidiNote>();
+    for (MidiNote n : notes) {
+      if (Math.random() < prob) {
+        int pitch = n.getPitch();
+        if (Math.random() < 0.5f) {
+          pitch = max(0, pitch-12);
+        } else {
+          pitch = min(127, pitch+12);
+        }
+        n = new MidiNote(pitch, n.getVelocity(), n.getStart(), n.getDuration());
+      }
+      mutated.add(n);
+    }
+    return mutated;
+  }
 
+  public void setRndMel(float r) { 
+    println("mutating pattern");
+    algoMel1(r*0.2);
+  }
+  public void setRndRyt(float r) { 
+    println("mutating pattern");
+  }
+  
   public void setLength(long ticks) { 
     this.nTicks = ticks;
     println("MM: pattern set length to "+ticks);
@@ -169,6 +241,9 @@ public class Pattern {
     sort();
   }
   public ArrayList<MidiNote> getNotes() {
+    if (childPattern != null) {
+      return childPattern.getNotes();
+    }
     return midiNotes;
   }
   public void remove(MidiNote note) { 
@@ -246,17 +321,17 @@ public class MyTrack {
    */
   private int midiChannel;
   private final ArrayList<Pattern> patterns = new ArrayList();
-  private ArrayList<MidiEvent> events = new ArrayList();
+  //private ArrayList<MidiEvent> events = new ArrayList();
   private int patternIdx;
   private int noteIdx;
-  private int eventIdx;
+  //private int eventIdx;
   private long tickcount;
   private boolean mute;
   private int octave;
   private int semitone;
   private float rndMel = 0.0;
   private float rndRyt = 0.0;
-  
+
   private int playmode;
   static public final int EOT = 0;            // Stop at end of track
   static public final int LOOP_TRACK = 1;     // Loop whole track
@@ -266,11 +341,10 @@ public class MyTrack {
     midiChannel = 0;
     patternIdx = 0;
     noteIdx = 0;
-    eventIdx = 0;
+    //eventIdx = 0;
     mute = false;
     playmode = EOT;
     tickcount = 0;
-    //rndMel = 0f;
   }
 
   public void addPattern(Pattern pattern) {
@@ -298,7 +372,9 @@ public class MyTrack {
   public int getChannel() { 
     return midiChannel;
   }
-  public void setMode(int mode) { playmode = mode; }
+  public void setMode(int mode) { 
+    playmode = mode;
+  }
 
   public void mute() { 
     println("MM: track muted");
@@ -318,13 +394,27 @@ public class MyTrack {
   public int getOctave() { 
     return octave;
   }
-  public int getSemitone() { return semitone; }
-  public void setSemitone(int s) { semitone = s; }
-  public float getRndMel() { return rndMel; }
-  public void setRndMel(float r) { rndMel = r; println(rndMel);}
-  public float getRndRyt() { return rndRyt; }
-  public void setRndRyt(float r) { rndRyt = r; }
-  
+  public int getSemitone() { 
+    return semitone;
+  }
+  public void setSemitone(int s) { 
+    semitone = s;
+  }
+  public float getRndMel() { 
+    return rndMel;
+  }
+  public void setRndMel(float r) { 
+    rndMel = r; 
+    patterns.get(patternIdx).setRndMel(r);
+  }
+  public float getRndRyt() { 
+    return rndRyt;
+  }
+  public void setRndRyt(float r) { 
+    rndRyt = r;
+    patterns.get(patternIdx).setRndMel(r);
+  }
+
   public long getTick() {
     long total = tickcount;
     for (int i=0; i<patternIdx; i++) {
@@ -344,13 +434,12 @@ public class MyTrack {
     if (patternIdx < patterns.size()) {
       ArrayList<MidiEvent> toPlay = new ArrayList(8);
 
-      /*if (tickcount == 0) {
-        // Load current pattern
-        events = patterns.get(patternIdx).asEvents(getChannel(), localTick);
-        Collections.sort(events, midiManager.new EventComparator());
-        eventIdx = 0;
-        noteIdx = 0;
-      }*/
+      if (tickcount == 0) {
+        // Apply randomness to pattern
+        if (getRndMel() > 0) {
+          patterns.get(patternIdx).setRndMel(getRndMel());
+        } 
+      }
 
       if (!mute) {
         ArrayList<MidiNote> notes = patterns.get(patternIdx).getNotes();
@@ -359,7 +448,8 @@ public class MyTrack {
           note = notes.get(noteIdx);
           if (octave != 0 || semitone != 0) {
             // Transpose notes by octaves and semitones
-            note = new MidiNote(note.getPitch()+12*octave+semitone, note.getVelocity(), note.getStart(), note.getDuration());
+            int pitch = Math.min(127, Math.max(0, note.getPitch()+12*octave+semitone));
+            note = new MidiNote(pitch, note.getVelocity(), note.getStart(), note.getDuration());
           }
           ArrayList<MidiEvent> events = note.asEvents(getChannel(), localTick);
           toPlay.addAll(events);
@@ -376,6 +466,7 @@ public class MyTrack {
         }
       }
       if (playmode == LOOP_TRACK && patternIdx>=patterns.size()) {
+        // Cumulates with above initialization
         patternIdx = 0;
       }
 
@@ -400,8 +491,6 @@ public class MidiManager extends Thread {
   private MyMidiReceiver midiIn;
   private Receiver midiOut;
 
-  //private final int[] activeNotesVel =  new int[128];
-  //private final long[] activeNotesTime = new long[128];
   private final boolean[] onNotes = new boolean[16*128];  // 16 midi channels, 128 pitches per channel
   public boolean running;
   public boolean recording;
@@ -417,11 +506,11 @@ public class MidiManager extends Thread {
   private long externalTickDuration;
   private final int tickResolution = 96; // Pulse Per Quarter note
   private boolean clockSlave;
-
+  private long now;
+  private long prev;
+  private int beat;
 
   public MidiManager() {
-    //Arrays.fill(activeNotesVel, 0);
-    //Arrays.fill(activeNotesTime, 0);
     Arrays.fill(onNotes, false);
     eventQueue = new PriorityQueue(32, new EventComparator());
     inputDevice = null;
@@ -436,7 +525,9 @@ public class MidiManager extends Thread {
     running = false;
     recording = false;
     setBpm(120);
-    //play();
+    beat = 0;
+    now = System.currentTimeMillis();
+    //playPause();
   }
 
   class EventComparator implements Comparator<MidiEvent> {
@@ -510,6 +601,7 @@ public class MidiManager extends Thread {
 
     @Override
       public void send(MidiMessage message, long timeStamp) {
+      println(message, localTick);
       if (message.getStatus() == ShortMessage.TIMING_CLOCK) {
         // Ignore clock timing messages for now
       } else if (readBufferIndex < readBuffer.length) {
@@ -597,12 +689,20 @@ public class MidiManager extends Thread {
     }
   }
 
-  public void play() {
-    println("MM: Playing started");
-    long now = System.currentTimeMillis();
-    lastTickTime = now;
-    lastLocalTickTime = now;
-    running = true;
+  public boolean playPause() {
+    if (running) {
+      println("MM: Playing paused");
+      allNotesOff();
+      running = false;
+    } else {
+      println("MM: Playing started");
+      // Why are we reseting tickTimes ? (we lose a tick)
+      now = System.currentTimeMillis();
+      lastTickTime = now;
+      lastLocalTickTime = now;
+      running = true;
+    }
+    return running;
   }
 
   public void songMode() {
@@ -621,7 +721,12 @@ public class MidiManager extends Thread {
       }
     }
 
-    // turn off remaining on notes to avoid stuck notes
+    allNotesOff();
+    running = false;
+  }
+
+  public void allNotesOff() {
+    // Turn off all playing notes
     for (int channel=0; channel<16; channel++) {
       for (int pitch=0; pitch<128; pitch++) {
         int idx = 128*channel + pitch;
@@ -636,8 +741,7 @@ public class MidiManager extends Thread {
         }
       }
     }
-    eventQueue.clear();
-    running = false;
+    //eventQueue.clear();
   }
 
   public void addTrack(MyTrack track) { 
@@ -658,7 +762,7 @@ public class MidiManager extends Thread {
     activePattern = pattern;
     patternTick = 0;
     patternPlaying = true;
-    play();
+    playPause();
     println("MM: Pattern loop started");
   }
 
@@ -672,7 +776,6 @@ public class MidiManager extends Thread {
       println("MM: Recording started");
       activePattern = pattern;
       recording = true;
-      //Arrays.fill(activeNotesVel, 0);
     }
   }
 
@@ -710,13 +813,18 @@ public class MidiManager extends Thread {
       }
     }
 
+    prev = now;
+    now = System.currentTimeMillis();
+    // Check if update rate is fast enough
+    if (now-prev > localTickDuration>>2) {
+      println("lagging");
+    }
+    
     if (isRunning()) {
       // Manage clock
       if (!clockSlave) {
-        long now = System.currentTimeMillis();
         // Update local ticks (may have a greater resolution that default Midi ticks)
         if (now - lastLocalTickTime >= localTickDuration) {
-          //println(now, lastLocalTickTime, now - lastLocalTickTime, localTickDuration);
           tick();
           lastLocalTickTime += localTickDuration;
         }
@@ -760,6 +868,22 @@ public class MidiManager extends Thread {
       if (patternTick >= activePattern.getLength()) {
         patternTick = 0;
       }
+
+      //  Record events to current pattern
+      if (isRecording()) {
+        if (patternTick % getPPQ() == 0) {
+          if (beat == 0) {
+            //beepHigh.stop();
+            beepHigh.setFramePosition(0);
+            beepHigh.start();
+          } else {
+            //beepLow.stop();
+            beepLow.setFramePosition(0);
+            beepLow.start();
+          }
+          beat = (beat+1) % 4;
+        }
+      }
     } else {
       // Song mode
       for (MyTrack t : tracks) {
@@ -781,14 +905,31 @@ public class MidiManager extends Thread {
 
   public void run () {
     println("Midi manager started...");
+
+    // Create click track sound samples
+    AudioFormat format = new AudioFormat(44100f, 16, 1, true, true);
+    byte[] beepLowBuffer = createSoundSample(44100, 880, 8, 0.3);
+    byte[] beepHighBuffer = createSoundSample(44100, 1760, 16, 0.5);
+    try {
+      beepLow = AudioSystem.getClip();
+      beepLow.open(format, beepLowBuffer, 0, beepLowBuffer.length);
+      beepHigh = AudioSystem.getClip();
+      beepHigh.open(format, beepHighBuffer, 0, beepHighBuffer.length);
+    } 
+    catch (LineUnavailableException e) {
+      e.printStackTrace();
+    }
+
     stopThread = false;
     while (!stopThread) {
       update();
+      /*
       try {
-        Thread.sleep(2L);
+        Thread.sleep(1L);
       } 
       catch (InterruptedException ignored) {
       }
+      */
     }
 
     // Close Midi ports
@@ -890,7 +1031,7 @@ public class MidiManager extends Thread {
       println("      div : " + format.getDivisionType());
       println("      " + seq.getTracks().length + " tracks");
 
-      int i=0;
+      //int i=0;
       for (Track track : seq.getTracks()) {
         // Convert from midi file tracks to this sequencer track format
         MyTrack newTrack = parseEvents(track, ppq);

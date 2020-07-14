@@ -1,3 +1,13 @@
+/****************************************************
+**  TODO :
+**    - Stop button - songmode/patternmode
+**    - Rec Btn
+**    - RndMel Fct
+**    - RndRyt Fct
+*****************************************************/
+
+
+
 MidiManager midiManager;
 UI ui = new UI();
 TracksWindow tracksWindow;
@@ -15,7 +25,6 @@ void setup() {
   midiManager.start();
   
   tracksWindow = new TracksWindow(ui);
-  
   tracksWindow.show();
 }
 
@@ -24,6 +33,7 @@ void draw() {
   //background(bgcolor);
   ui.render();
 }
+
 
 
 //

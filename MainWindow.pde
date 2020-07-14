@@ -72,6 +72,7 @@ class TracksWindow extends Window {
       }
       surface.setTitle("MyLiveSeq - "+fileToLoad);
       fileToLoad = null;
+      midiManager.songMode();
     }
     
     renderCount = 0;

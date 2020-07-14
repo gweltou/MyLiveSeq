@@ -1,7 +1,7 @@
 import java.util.concurrent.Callable;
 
 static final boolean DEBUG = false;
-static final boolean LAZY_RENDERING = true;
+static final boolean LAZY_RENDERING = false;
 
 
 static final int ALIGN_ROW = 1;
@@ -1008,7 +1008,7 @@ class ToolBar extends DynamicContainer {
     transport.setSpacing(3);
     transport.setPadding(2);
     add(transport);
-    Button playBtn = new PlayButton("PLAY");
+    Button playBtn = new PlayButton();
     transport.add(playBtn);
     Button stopBtn = new StopButton("STOP");
     transport.add(stopBtn);
@@ -1035,11 +1035,15 @@ class ToolBar extends DynamicContainer {
   }
   
   class PlayButton extends Button {
-    public PlayButton(String s) {
-      super(s);
+    public PlayButton() {
+      super("PLAY");
     }
     public void action() {
-      midiManager.play();
+      if (midiManager.playPause() == true) {
+        setValue("PAUS");
+      } else {
+        setValue("PLAY");
+      }
     }
   }
   class StopButton extends Button {
