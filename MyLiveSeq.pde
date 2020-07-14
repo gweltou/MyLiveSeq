@@ -2,8 +2,8 @@
 **  TODO :
 **    - Stop button - songmode/patternmode
 **    - Rec Btn
-**    - RndMel Fct
-**    - RndRyt Fct
+**    - Mute button (mute off not working)
+**    - 
 *****************************************************/
 
 

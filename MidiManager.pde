@@ -138,6 +138,7 @@ public class Pattern {
   protected final ArrayList<MidiNote> midiNotes = new ArrayList();
   private long nTicks = 0;
   private Pattern childPattern = null;
+  private float rndMel, rndRyt;
 
   public Pattern() { 
     this(32*midiManager.getPPQ());
@@ -151,15 +152,8 @@ public class Pattern {
     midiEvents.addAll(other.getEvents());
   }
   
-  public void algoMel1(float prob) {
-    ArrayList<MidiNote> mutated = this.algoMel1(this.midiNotes, prob);
-    childPattern = new Pattern();
-    childPattern.addNotes(mutated);
-  }
-  
   public ArrayList<MidiNote> algoMel1(ArrayList<MidiNote> notes, float prob) {
     // Raise or lower notes by 1 octave
-    
     ArrayList<MidiNote> mutated = new ArrayList<MidiNote>();
     for (MidiNote n : notes) {
       if (Math.random() < prob) {
@@ -175,13 +169,44 @@ public class Pattern {
     }
     return mutated;
   }
-
-  public void setRndMel(float r) { 
-    println("mutating pattern");
-    algoMel1(r*0.2);
+  
+  public ArrayList<MidiNote> algoMel2(ArrayList<MidiNote> notes, float prob) {
+    // Switch notes pitch with other notes in pattern
+    ArrayList<MidiNote> mutated = new ArrayList<MidiNote>();
+    for (MidiNote n : notes) {
+      if (Math.random() < prob) {
+        int pitch = notes.get((int) Math.floor(Math.random()*notes.size())).getPitch();
+        n = new MidiNote(pitch, n.getVelocity(), n.getStart(), n.getDuration());
+      }
+      mutated.add(n);
+    }
+    return mutated;
   }
-  public void setRndRyt(float r) { 
-    println("mutating pattern");
+  
+  public ArrayList<MidiNote> algoRyt1(ArrayList<MidiNote> notes, float prob) {
+    // Remove random notes
+    ArrayList<MidiNote> mutated = new ArrayList<MidiNote>();
+    for (MidiNote n : notes) {
+      if (Math.random() >= prob) {
+        mutated.add(n);
+      }
+    }
+    return mutated;
+  }
+
+  public void setRndMel(float r) {
+    rndMel = r;
+    mutatePattern(rndMel, rndRyt);
+  }
+  public void setRndRyt(float r) {
+    rndRyt = r;
+    mutatePattern(rndMel, rndRyt);
+  }
+  
+  private void mutatePattern(float mr, float rr) {
+    // Melody modulation is applied before rythme modulation
+    childPattern = new Pattern();
+    childPattern.addNotes(algoRyt1(algoMel1(algoMel2(midiNotes, mr*0.4), mr*0.4), rr*0.3));
   }
   
   public void setLength(long ticks) { 
@@ -406,13 +431,25 @@ public class MyTrack {
   public void setRndMel(float r) { 
     rndMel = r; 
     patterns.get(patternIdx).setRndMel(r);
+    // We need to reset noteIdx (because of rythm modulation)
+    ArrayList<MidiNote> notes = patterns.get(patternIdx).getNotes();
+    noteIdx = 0;
+    while (noteIdx < notes.size() && notes.get(noteIdx).getStart() < tickcount) {
+      noteIdx++;
+    }
   }
   public float getRndRyt() { 
     return rndRyt;
   }
   public void setRndRyt(float r) { 
     rndRyt = r;
-    patterns.get(patternIdx).setRndMel(r);
+    patterns.get(patternIdx).setRndRyt(r);
+    // We need to reset noteIdx (because of rythm modulation)
+    ArrayList<MidiNote> notes = patterns.get(patternIdx).getNotes();
+    noteIdx = 0;
+    while (noteIdx < notes.size() && notes.get(noteIdx).getStart() < tickcount) {
+      noteIdx++;
+    }
   }
 
   public long getTick() {
@@ -444,7 +481,8 @@ public class MyTrack {
       if (!mute) {
         ArrayList<MidiNote> notes = patterns.get(patternIdx).getNotes();
         MidiNote note;
-        while (noteIdx<notes.size() && notes.get(noteIdx).getStart() <= tickcount) {
+        //while (noteIdx<notes.size() && notes.get(noteIdx).getStart() <= tickcount) {
+        while (noteIdx<notes.size() && notes.get(noteIdx).getStart() == tickcount) {
           note = notes.get(noteIdx);
           if (octave != 0 || semitone != 0) {
             // Transpose notes by octaves and semitones
